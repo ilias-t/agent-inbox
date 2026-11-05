@@ -4,7 +4,7 @@ Thanks for helping. Bug reports and ideas go in [issues](https://github.com/ilia
 
 ## Setup
 
-Follow the README's [Try it locally](README.md#try-it-locally): Node ≥ 22.9, `npm ci`, a `wrangler.jsonc` copied from `wrangler.example.jsonc`, `.dev.vars` from `.dev.vars.example`, and `npm run worker:dev`. You don't need a Cloudflare account; everything runs against a local D1 in `.wrangler/`.
+Follow the README's [Try it locally](README.md#try-it-locally): Node ≥ 22.12, `npm ci`, a `wrangler.jsonc` copied from `wrangler.example.jsonc`, `.dev.vars` from `.dev.vars.example`, and `npm run worker:dev`. You don't need a Cloudflare account; everything runs against a local D1 in `.wrangler/`.
 
 For UI work, run Vite with hot reload next to the Worker:
 

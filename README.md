@@ -61,7 +61,7 @@ agent ──agent-inbox post──▶ Worker + D1 ──notify──▶ your pho
 
 ## Try it locally
 
-You need Node ≥ 22.9 and git. No Cloudflare account: `wrangler dev` runs the Worker and a local D1 on your machine.
+You need Node ≥ 22.12 and git. No Cloudflare account: `wrangler dev` runs the Worker and a local D1 on your machine.
 
 ```bash
 git clone https://github.com/ilias-t/agent-inbox && cd agent-inbox
