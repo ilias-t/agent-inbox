@@ -61,6 +61,16 @@ Debugging a failure:
 - In CI, a failed `e2e` job uploads the `playwright-report` artifact (the HTML report, `test-results/` with the traces, and the server log). Download it from the run's Summary page, unzip it, and run `npx playwright show-report playwright-report` or `npx playwright show-trace test-results/<test>/trace.zip`; https://trace.playwright.dev opens a trace in the browser too.
 - `PWDEBUG=1 npm run e2e -- -g "<title>"` steps through one test in the Playwright Inspector.
 
+## Issues
+
+Bug reports and feature requests use the forms in the issue chooser. Planned work uses the **Task** template:
+
+- **Title:** what should happen, as an imperative phrase under 70 characters ("Record who decides from an ntfy notification").
+- **Goal** first, in one or two sentences. If it needs more, split the issue or open a tracking issue that links its parts.
+- **Why** links to the code, docs or discussion behind it. Link, don't paste.
+- **Done when** lists results someone can check, not steps. How to get there belongs in the pull request.
+- Keep it short and stick to what's known. No estimates, no guesses dressed up as facts.
+
 ## License of contributions
 
 agent-inbox is source-available under [FSL-1.1-MIT](LICENSE.md): free to use, modify and self-host, including at work, but not to offer as a competing commercial product or service, and each release becomes MIT two years after it's published. By sending a pull request you agree that your contribution is licensed under the same terms. There is no contributor license agreement to sign.
