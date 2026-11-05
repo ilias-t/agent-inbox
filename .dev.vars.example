@@ -1,0 +1,16 @@
+# Copy to .dev.vars for `wrangler dev`. Never commit .dev.vars.
+# Skip Cloudflare Access on localhost only: browser calls act as this email.
+DEV_NO_ACCESS=1
+DEV_USER_EMAIL=dev@localhost
+# Deprecated (roles are set in Settings → People): admins while they have no saved role.
+# ADMIN_EMAILS=dev@localhost
+# Optional integrations
+# GITHUB_WEBHOOK_SECRET=change-me
+# NTFY_TOPIC=agent-inbox-<random>
+# NTFY_SERVER=https://ntfy.sh
+# NTFY_TOKEN=
+# NTFY_ACTION_SECRET=change-me
+# Web Push: unset, a VAPID key pair is generated on first use and kept in local D1.
+# VAPID_PUBLIC_KEY=
+# VAPID_PRIVATE_KEY=
+# VAPID_SUBJECT=mailto:you@example.com

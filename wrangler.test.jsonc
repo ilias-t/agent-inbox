@@ -1,0 +1,37 @@
+// agent-inbox: the wrangler config for tests. vitest (vitest.config.ts) and the
+// e2e suite (e2e/global-setup.ts, e2e/support/data.ts) read this file, never
+// wrangler.jsonc, so a fresh clone and CI run them with no private config. The
+// values are fake and only ever used locally: the D1 id names a local SQLite
+// file, and vitest sets its own vars. It matches wrangler.example.jsonc except
+// for those values (test/shared/wrangler-config.test.ts checks that), so change
+// both files together.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "agent-inbox",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat", "enable_request_signal"],
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/agent/*", "/hooks/*"],
+  },
+  "workers_dev": true,
+  "preview_urls": false,
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "agent-inbox",
+      "database_id": "00000000-0000-4000-8000-000000000000",
+      "migrations_dir": "migrations",
+    },
+  ],
+  "vars": {
+    "ACCESS_TEAM_DOMAIN": "team.cloudflareaccess.test",
+    "ACCESS_AUD": "test-aud",
+    "PUBLIC_URL": "https://inbox.test",
+  },
+  "triggers": { "crons": ["17 4 * * *"] },
+  "observability": { "enabled": true },
+}

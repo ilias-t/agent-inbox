@@ -1,0 +1,58 @@
+name: Bug report
+description: Something in the inbox, the CLI, the API or the docs doesn't work as described.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. If this is a security problem, don't file it here: follow SECURITY.md instead.
+        Please leave out tokens (`ait_...`), hostnames, emails and other details of your deployment.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Ideally against a local `wrangler dev` with the seed data (README → Try it locally).
+      placeholder: |
+        1. npm run worker:dev (and npm run seed:local in a second terminal)
+        2. Open http://localhost:8787 and ...
+        3. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where
+      options:
+        - Web app (inbox, item page, Settings)
+        - CLI (agent-inbox)
+        - HTTP API / Worker
+        - Notifications (Web Push, ntfy)
+        - Skills
+        - Deploy / local setup
+        - Docs
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Commit
+      description: "`git rev-parse --short HEAD` of the checkout you ran or deployed."
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: Browser and device for UI bugs; Node version and OS for the CLI or local setup.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: CLI output, the browser console, or `wrangler dev` output. Redact anything private.
+      render: text

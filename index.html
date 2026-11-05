@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Agent Inbox</title>
+<meta name="theme-color" content="#f4f5f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0c0f14" media="(prefers-color-scheme: dark)">
+<!-- Home-screen app. The manifest and icons live in public/ (scripts/make-icons.mjs); behind
+     Cloudflare Access the manifest fetch needs the session cookie, hence use-credentials. -->
+<link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Inbox">
+<!-- "default" keeps content below the status bar and lets iOS tint it from theme-color in both themes. -->
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232c56c9'/%3E%3Cpath d='M8 17v5.5h16V17h-5l-1.5 2.5h-3L13 17z' fill='%23fff'/%3E%3Cpath d='M8 17l3-7.5h10l3 7.5' fill='none' stroke='%23fff' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E">
+<!-- The Content-Security-Policy allows this inline script by its hash, which the build computes
+     from dist/index.html (vite.config.ts, shared/security-headers.ts): edit it freely. -->
+<script>
+  // Apply the saved theme before first paint (System / Light / Dark; see src/state.ts).
+  try { var t = localStorage.getItem("agent-inbox-theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (e) {}
+</script>
+</head>
+<body>
+<div class="wrap">
+  <!-- Offline banner (src/views/header.ts renderOfflineBanner): when the inbox shown is from, and Try again. Not a live
+       region (it toggles hidden): going offline and coming back are announced through #sr-status (src/main.ts). -->
+  <div class="offline" id="offline" hidden>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M8.5 8.6A5.5 5.5 0 0 0 7 19h10"/><path d="M11.3 6.1A5.5 5.5 0 0 1 17.5 10a4.5 4.5 0 0 1 3 7.2"/></svg>
+    <span class="offtext" id="offline-text"><b>Offline.</b> Updates resume when you reconnect.</span>
+    <button type="button" class="offretry" data-retry>Try again</button>
+  </div>
+  <!-- Top bar: title and badge, the main nav (in the bar from 700px, a fixed bottom bar on phones), keyboard help, Settings.
+       html[data-layout] and html[data-route] (src/main.ts) say which parts show. -->
+  <header class="topbar" id="topbar">
+    <div class="h1row"><h1>Agent Inbox</h1><span class="hbadge" id="hbadge" aria-live="polite" hidden></span></div>
+    <!-- Links, not tabs: aria-current marks where you are (src/views/header.ts renderNav). Focus and Settings are for
+         phones; from 700px the gear is the one Settings link. -->
+    <nav class="mainnav" id="mainnav" aria-label="Main">
+      <a id="nav-inbox" href="#inbox" aria-keyshortcuts="g i"><span class="nicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 13l3-8h12l3 8v6H3z"/><path d="M3 13h5l1 3h6l1-3h5"/></svg><span class="hotdot" id="hot-inbox" hidden></span></span><span class="nlbl">Inbox</span> <span class="count" id="count-inbox"></span></a>
+      <a id="nav-team" href="#team" aria-keyshortcuts="g t"><span class="nicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.8a3.3 3.3 0 0 1 0 6.4"/><path d="M18 14.8c1.8.7 3 2.5 3.5 5.2"/></svg></span><span class="nlbl">Team</span> <span class="count" id="count-team"></span></a>
+      <!-- Shown once a review routine has reported (src/views/header.ts renderNav); on phones it takes Team's place. -->
+      <a id="nav-reviews" href="#reviews" aria-keyshortcuts="g r" hidden><span class="nicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M6 8.5v7"/><path d="M18 15.5V10a3 3 0 0 0-3-3h-4.5"/><path d="M13 4.5 10.5 7 13 9.5"/></svg></span><span class="nlbl">Reviews</span></a>
+      <a id="nav-focus" class="navfocus phoneonly idle" href="#inbox"><span class="nicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="6.5"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></span><span class="nlbl">Focus</span> <span class="count" id="count-focus"></span></a>
+      <a id="nav-history" href="#history" aria-keyshortcuts="g h"><span class="nicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 12a8.5 8.5 0 1 0 2.5-6"/><path d="M3 4v4h4"/><path d="M12 8v4l3 2"/></svg></span><span class="nlbl">History</span> <span class="count" id="count-history"></span></a>
+      <a id="nav-settings" class="phoneonly" href="#settings" aria-keyshortcuts="g s"><span class="nicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></span><span class="nlbl">Settings</span></a>
+    </nav>
+    <div class="tbend">
+      <button type="button" class="iconlink kbdonly" data-key-help title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="15" height="10" rx="2"/><path d="M6 8.5h.01M9 8.5h.01M12 8.5h.01M15 8.5h-.99M6.5 12h7"/></svg></button>
+      <a class="iconlink" id="settings-link" href="#settings" title="Settings" aria-label="Settings" aria-keyshortcuts="g s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></a>
+    </div>
+  </header>
+
+  <main class="panes" id="panes">
+    <!-- Index: the manager card, then the shown list -->
+    <div id="index-view" class="stack">
+      <!-- The manager card: one status line (it opens to the manager session, the cadence and Run tick now), then the digest. -->
+      <section class="mcard" id="manager" aria-label="Orchestrator">
+        <details class="hstatus" id="hstatus">
+          <summary><span class="tick unknown" id="tick"><span class="dot" aria-hidden="true"></span><span class="vh">Orchestrator status: </span><span id="tick-text">Waiting for the orchestrator</span></span><span class="caret" aria-hidden="true">&rsaquo;</span></summary>
+          <div class="hsbody">
+            <div class="ticks" id="tick-detail" hidden></div>
+            <div class="lease" id="lease" hidden></div>
+            <div class="cadence" id="cadence">Decisions picked up every ~10 min &middot; full sweep every ~30 min</div>
+            <form class="tickrow" id="tick-form" autocomplete="off">
+              <div class="ticknote">
+                <textarea id="tick-note" rows="1" maxlength="2000" enterkeyhint="enter" placeholder="Note for the orchestrator" aria-label="Note for the orchestrator (optional)" aria-describedby="tick-hint"></textarea>
+                <div class="tickmeta"><span class="tickhint kbdonly" id="tick-hint">Enter sends &middot; Shift+Enter for a new line</span><span class="tickcount" id="tick-count" hidden></span></div>
+              </div>
+              <button type="submit" class="btn" id="tick-btn">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9"/><path d="M13.5 2.5v3h-3"/></svg>
+                Run tick now
+              </button>
+            </form>
+            <div class="tickfb" id="tick-fb" role="status" aria-live="polite"></div>
+          </div>
+        </details>
+        <!-- Opens by itself when the digest changed since this viewer last saw it (src/views/header.ts), marked New. -->
+        <details class="fold digest" id="digest" hidden>
+          <summary><span class="flbl">Digest</span><span class="fprev" id="digest-prev" aria-hidden="true"></span><span class="dnew" id="digest-new" hidden>New</span><span class="caret" aria-hidden="true">&rsaquo;</span></summary>
+          <div class="fbody md" id="digest-body"></div>
+        </details>
+      </section>
+
+      <section id="view-inbox" aria-label="Inbox">
+        <div class="afilter" id="inbox-filter" hidden></div>
+        <div class="rows qlist" id="inbox-list">
+          <div class="skel" aria-busy="true"><div class="bar"></div><div class="bar"></div><div class="bar"></div></div>
+        </div>
+      </section>
+      <section id="view-team" aria-label="Team" hidden>
+        <p class="tsum" id="team-sum" hidden></p>
+        <div class="rows" id="team-list"></div>
+      </section>
+      <!-- The Reviews tab (src/views/reviews.ts): the routine's card and the Runs | PRs toggle outside the list, which
+           re-renders on live updates, so the toggle keeps focus. -->
+      <section id="view-reviews" aria-label="Reviews" hidden>
+        <div id="reviews-card" hidden></div>
+        <div class="afilter rvseg" id="reviews-seg" hidden></div>
+        <div class="rows qlist" id="reviews-list"></div>
+      </section>
+      <section id="view-history" aria-label="History" hidden>
+        <!-- Outside the list, which re-renders on every live update: the field keeps its text, caret and focus. -->
+        <div class="hbar" id="history-bar" hidden>
+          <div class="hsearch">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="m13 13 4 4"/></svg>
+            <input type="search" class="inp" id="history-search" placeholder="Search titles, notes, O3…" aria-label="Search History" aria-describedby="history-count" autocomplete="off" spellcheck="false" enterkeyhint="search" maxlength="200">
+            <kbd class="kbdonly" aria-hidden="true">/</kbd>
+          </div>
+          <div class="hfilt">
+            <div class="hchips" id="history-filters" role="radiogroup" aria-label="Show"></div>
+            <span class="hcount mono" id="history-count" aria-live="polite"></span>
+          </div>
+        </div>
+        <div class="rows qlist" id="history-list"></div>
+      </section>
+    </div>
+
+    <!-- Show page: one item, one orchestrator, or settings -->
+    <div id="detail-view" hidden>
+      <div class="dhead">
+        <!-- Phones, on an item page: the focus strip. The manager's status (src/views/header.ts renderStatus) links to the
+             queue, where its card has the schedule and Run tick now; the back link reads "Queue ⌄" from the Inbox. -->
+        <a class="fstatus" id="focus-status" href="#inbox" title="The queue, with the orchestrator's schedule and Run tick now"><span class="tick unknown" id="ftick"><span class="dot" aria-hidden="true"></span><span class="vh">Orchestrator status: </span><span class="ftext" id="ftick-text">Waiting for the orchestrator</span></span></a>
+        <a class="back" id="back-link" href="#inbox"><span class="barr" aria-hidden="true">&lsaquo;</span> <span id="back-label">Inbox</span><svg class="qchev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>
+        <!-- Item pages: previous / next in the inbox's order. A bottom bar on phones; from 700px the item pane's header
+             ("1 of 5", the progress segments, prev / next), the back link hidden as the list is beside it. -->
+        <nav class="pager" id="pager" aria-label="Inbox items" hidden></nav>
+      </div>
+      <!-- Phones, on an item page: the next items' edges stacked above it, one link back to the queue (src/views/item.ts
+           renderPeek). -->
+      <a class="peek" id="peek" href="#inbox" hidden></a>
+      <div id="detail"></div>
+      <!-- From 1100px, under the item pane: the everyday keys and "? All keys" (src/views/keys.ts hintsHtml). -->
+      <div class="keybar kbdonly" id="key-hints"></div>
+    </div>
+    <!-- From 700px, beside a list with nothing selected: where the item opens (src/views/index.ts renderPlaceholder). -->
+    <div class="splitph" id="split-empty"></div>
+  </main>
+</div>
+<dialog class="keyhelp" id="key-help" aria-labelledby="key-help-title">
+  <div class="kbox">
+    <div class="khead"><h2 id="key-help-title">Keyboard shortcuts</h2><button type="button" class="iconlink" id="key-help-close" aria-label="Close">&times;</button></div>
+    <div id="key-help-body"></div>
+  </div>
+</dialog>
+<!-- An item's secondary blocks on phones and mid-size screens (Q&A, snooze, assignee, context, evidence, history):
+     a bottom sheet on phones, a centred panel from 700px. Persistent, so a live re-render of #more-body
+     (src/views/item.ts) doesn't close it; from 1100px the same blocks render inline on the item page instead. -->
+<dialog class="sheet" id="more-sheet" aria-labelledby="more-title">
+  <div class="shead"><span class="grip" aria-hidden="true"></span><h2 id="more-title">More for this decision</h2><button type="button" class="iconlink" id="more-close" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+  <div class="sbody" id="more-body"></div>
+</dialog>
+<!-- Live regions stay rendered (visually hidden while empty) so screen readers announce what lands in them. -->
+<div class="toast empty" id="toast-box">
+  <div class="toastmsg" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+  <button type="button" class="toastx" id="toast-close" aria-label="Dismiss" hidden>&times;</button>
+</div>
+<div class="vh" id="sr-status" role="status" aria-live="polite" aria-atomic="true"></div>
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>

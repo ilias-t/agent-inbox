@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Phone · Opens on the top ask</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wdth,wght@0,75..100,400..700;1,75..100,400..700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#2d46c0}a:hover{color:#1f3399}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; position: relative; overflow: hidden; background: {{well}}; color: {{ink}}; font-family: 'Instrument Sans', sans-serif; font-size: 15px; line-height: 20px; font-variant-numeric: tabular-nums;">
+
+  <div style="position: absolute; top: 0; left: 0; right: 0; height: 44px; padding: 0 8px 0 16px; display: flex; align-items: center; gap: 4px;">
+    <a href="Phone-Queue.dc.html" aria-label="Manager: next pickup 14:23, last tick 7 minutes ago. Open the queue for the schedule and Run tick now." style="flex: 1; min-width: 0; min-height: 44px; display: flex; align-items: center; gap: 8px; color: {{ink2}}; text-decoration: none; font-size: 14px; line-height: 18px; white-space: nowrap;">
+      <span aria-hidden="true" style="flex: none; width: 7px; height: 7px; border-radius: 50%; background: {{ok}}; box-shadow: {{glowOk}};"></span>
+      <span style="font-weight: 600; color: {{ink}};">Next pickup <span style="text-shadow: {{glowInk}};">14:23</span></span>
+      <span style="color: {{ink3}};">last tick 7m ago</span>
+    </a>
+    <a href="Phone-Queue.dc.html" style="flex: none; min-height: 44px; padding: 0 8px; display: flex; align-items: center; gap: 4px; color: {{ink}}; text-decoration: none; font-size: 14px; font-weight: 600;">Queue<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></a>
+  </div>
+
+  <a href="Phone-Queue.dc.html" aria-label="Up next: 4 more asks and 1 decided for you. Open the queue." style="position: absolute; top: 44px; left: 0; right: 0; height: 84px; display: block; color: {{ink3}}; text-decoration: none; font-size: 13px; line-height: 16px;">
+    <span style="position: absolute; top: 0; left: 32px; right: 32px; height: 80px; box-sizing: border-box; padding: 0 14px; border-radius: 14px 14px 0 0; background: {{edge3}}; box-shadow: {{edgeRing}}; display: flex; align-items: flex-start;">
+      <span style="height: 26px; flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px;">
+        <span aria-hidden="true" style="flex: none; width: 8px; height: 8px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid {{ink3}};"></span>
+        <span style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">PR #12: dedupe webhook deliveries</span>
+        <span style="flex: none;">8m</span>
+      </span>
+    </span>
+    <span style="position: absolute; top: 26px; left: 20px; right: 20px; height: 80px; box-sizing: border-box; padding: 0 14px; border-radius: 14px 14px 0 0; background: {{edge2}}; box-shadow: {{edgeRing}}; display: flex; align-items: flex-start;">
+      <span style="height: 26px; flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px;">
+        <span aria-hidden="true" style="flex: none; width: 8px; height: 8px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid {{ink3}};"></span>
+        <span style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Start an orchestrator on the end-of-day digest?</span>
+        <span style="flex: none;">2h</span>
+      </span>
+    </span>
+    <span style="position: absolute; top: 52px; left: 8px; right: 8px; height: 80px; box-sizing: border-box; padding: 0 14px; border-radius: 16px 16px 0 0; background: {{edge1}}; box-shadow: {{edgeRing1}}; display: flex; align-items: flex-start; color: {{ink2}};">
+      <span style="height: 28px; flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px;">
+        <span aria-hidden="true" style="flex: none; width: 8px; height: 8px; border-radius: 50%; background: {{hi}}; box-shadow: {{glowHi}};"></span>
+        <span style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500;">Can you renew the e2e-staging service token?</span>
+        <span style="flex: none; color: {{ink3}};">27m</span>
+      </span>
+    </span>
+  </a>
+
+  <section aria-label="Current ask" style="position: absolute; top: 120px; left: 0; right: 0; bottom: 0; box-sizing: border-box; padding: 12px 16px 12px; border-radius: 20px 20px 0 0; background: {{sheet}}; box-shadow: {{lift}}; display: flex; flex-direction: column;">
+
+    <div style="flex: none; height: 20px; display: flex; align-items: center; gap: 10px;">
+      <span aria-hidden="true" style="flex: 1; display: flex; gap: 3px;">
+        <span style="flex: 1; height: 3px; border-radius: 2px; background: {{accent}}; box-shadow: {{glow}};"></span>
+        <span style="flex: 1; height: 3px; border-radius: 2px; background: {{track}};"></span>
+        <span style="flex: 1; height: 3px; border-radius: 2px; background: {{track}};"></span>
+        <span style="flex: 1; height: 3px; border-radius: 2px; background: {{track}};"></span>
+        <span style="flex: 1; height: 3px; border-radius: 2px; background: {{track}};"></span>
+      </span>
+      <span style="flex: none; font-size: 13px; line-height: 16px; font-weight: 600; color: {{ink2}};"><span style="color: {{accentText}}; text-shadow: {{glow}};">1</span> of 5</span>
+    </div>
+
+    <div style="flex: none; margin-top: 2px; height: 44px; display: flex; align-items: center; gap: 10px; font-size: 13px; line-height: 18px; color: {{ink3}}; white-space: nowrap;">
+      <span style="display: inline-flex; align-items: center; gap: 6px; color: {{hiText}}; font-weight: 600;"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%; background: {{hi}}; box-shadow: {{glowHi}};"></span>High</span>
+      <span style="font-weight: 600; color: {{ink2}};">Decision</span>
+      <span style="font-weight: 600; color: {{accentText}};">You</span>
+      <span>31m</span>
+      <a href="Phone-Night.dc.html" aria-label="O3 change log: why and goal" style="margin-left: auto; min-height: 44px; padding-left: 4px; display: inline-flex; align-items: center; gap: 2px; color: {{ink2}}; text-decoration: none; font-weight: 600;">O3 change log<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"></path></svg></a>
+      <a href="Phone-Night.dc.html" aria-label="More for this decision: questions, snooze, assignee, context, evidence" style="flex: none; width: 44px; height: 44px; margin-right: -12px; display: flex; align-items: center; justify-content: center; border-radius: 12px; color: {{ink}};">
+        <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="5.5" cy="12" r="1.7"></circle><circle cx="12" cy="12" r="1.7"></circle><circle cx="18.5" cy="12" r="1.7"></circle></svg>
+      </a>
+    </div>
+
+    <h1 tabindex="-1" style="flex: none; margin: 2px 0 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.015em;">Keep D1 triggers, or write change rows in the Worker?</h1>
+    <p style="flex: none; margin: 6px 0 0; font-size: 15px; line-height: 21px; color: {{ink2}};">Importing 400 docs woke the manager 400 times.</p>
+
+    <ul style="flex: none; margin: 8px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; border-top: 1px solid {{line}};">
+      <li style="border-bottom: 1px solid {{line}};">
+        <a href="Phone-Night.dc.html" style="min-height: 44px; display: flex; align-items: center; gap: 10px; color: {{ink}}; text-decoration: none; font-size: 14px;">
+          <span aria-hidden="true" style="flex: none; width: 16px; display: flex; justify-content: center;"><span style="width: 7px; height: 7px; border-radius: 50%; background: {{accent}}; box-shadow: {{glow}};"></span></span>
+          <span style="font-weight: 600; color: {{accentText}};">O3 answered your question</span>
+          <span style="color: {{ink3}};">4m ago</span>
+          <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: auto; color: {{ink3}};"><path d="M9 6l6 6-6 6"></path></svg>
+        </a>
+      </li>
+      <li style="min-height: 36px; border-bottom: 1px solid {{line}}; display: flex; align-items: center; gap: 10px; font-size: 14px; line-height: 20px; color: {{ink2}}; white-space: nowrap;">
+        <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none; color: {{ink3}};"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5V12l3 2"></path></svg>
+        <span><span style="font-weight: 600; color: {{ink}};">Cost of waiting</span> O3 is idle until you decide.</span>
+      </li>
+    </ul>
+
+    <fieldset style="margin: auto 0 0; padding: 10px 0 0; border: 0; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+      <legend style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;">Your call</legend>
+      <label style="display: grid; grid-template-columns: 22px 1fr; column-gap: 12px; padding: 12px 14px 12px 12px; border-radius: 14px; background: {{raised2}}; box-shadow: {{selRing}};">
+        <input type="radio" name="call" value="a" checked="checked" style="margin: 1px 0 0; width: 20px; height: 20px; accent-color: {{accent}};">
+        <span style="display: flex; flex-direction: column; gap: 4px; min-width: 0;">
+          <span style="font-size: 17px; line-height: 22px; font-weight: 600;">Keep triggers, filter by actor</span>
+          <span style="display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; line-height: 18px;"><span style="font-weight: 600; color: {{accentText}};">Recommended, high confidence</span><span style="flex: none; display: inline-flex; align-items: center; gap: 4px; color: {{ink3}};"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h11a4 4 0 0 1 0 8H9"></path><path d="M7 6L4 9l3 3"></path></svg>Reversible</span></span>
+          <span style="font-size: 14px; line-height: 20px; color: {{ink2}};">Keeps the log complete by construction.</span>
+          <span style="font-size: 14px; line-height: 20px; color: {{ink2}};"><span style="font-weight: 600; color: {{ink}};">Then</span> O3 adds a test that <code style="font-family: inherit; font-weight: 600; color: {{ink}};">wait --human</code> ignores import rows.</span>
+        </span>
+      </label>
+      <label style="display: grid; grid-template-columns: 22px 1fr; column-gap: 12px; padding: 12px 14px 12px 12px; border-radius: 14px; background: {{raised}}; box-shadow: {{elev}};">
+        <input type="radio" name="call" value="b" style="margin: 1px 0 0; width: 20px; height: 20px; accent-color: {{accent}};">
+        <span style="display: flex; flex-direction: column; gap: 4px; min-width: 0;">
+          <span style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px;"><span style="font-size: 17px; line-height: 22px; font-weight: 600;">Write rows in the Worker</span><span style="flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: 13px; line-height: 18px; color: {{ink3}};"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15M14 7l5 5-5 5"></path></svg>One-way</span></span>
+          <span style="font-size: 14px; line-height: 20px; color: {{ink2}};"><span style="font-weight: 600; color: {{ink}};">Tradeoff</span> Every write path must remember to log.</span>
+        </span>
+      </label>
+      <label style="display: grid; grid-template-columns: 22px 1fr; column-gap: 12px; padding: 12px 14px 12px 12px; border-radius: 14px; background: {{raised}}; box-shadow: {{elev}};">
+        <input type="radio" name="call" value="other" style="margin: 1px 0 0; width: 20px; height: 20px; accent-color: {{accent}};">
+        <span style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px; min-width: 0;"><span style="font-size: 17px; line-height: 22px; font-weight: 600;">Other…</span><span style="font-size: 13px; line-height: 18px; color: {{ink3}};">needs a note</span></span>
+      </label>
+    </fieldset>
+
+    <button type="button" style="flex: none; margin-top: 4px; min-height: 44px; padding: 0 2px; border: 0; background: transparent; color: {{ink2}}; font: inherit; font-size: 14px; font-weight: 600; text-align: left; display: flex; align-items: center; gap: 8px;">
+      <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>Add a note for O3 <span style="font-weight: 400; color: {{ink3}};">optional</span>
+    </button>
+
+    <div style="flex: none; margin-top: 6px; display: grid; grid-template-columns: 52px 1fr 52px; gap: 8px; height: 52px;">
+      <button type="button" disabled="disabled" aria-label="Previous: this is the first ask" style="display: flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 14px; background: transparent; box-shadow: {{elevBtnOff}}; color: {{ink3}}; opacity: 0.55;">
+        <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"></path></svg>
+      </button>
+      <button type="button" aria-describedby="next-hint" style="border: 0; border-radius: 14px; background: {{accent}}; box-shadow: {{ctaGlow}}; color: {{onAccent}}; font: inherit; font-size: 16px; font-weight: 600;">Submit: Keep triggers</button>
+      <a href="Main.dc.html" aria-label="Skip to next: renew the e2e-staging token" style="display: flex; align-items: center; justify-content: center; border-radius: 14px; background: {{raised}}; box-shadow: {{elevBtn}}; color: {{ink}};">
+        <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"></path></svg>
+      </a>
+    </div>
+    <p id="next-hint" style="flex: none; margin: 6px 0 0; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; line-height: 18px; color: {{ink3}}; white-space: nowrap;">
+      <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 7l5 5-5 5"></path></svg>
+      <span>Then next: <span style="font-weight: 600; color: {{ink2}};">Renew the e2e-staging token</span></span>
+    </p>
+
+  </section>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const dark = this.props.dark === true || this.props.dark === 'true';
+    if (dark) {
+      return { well: '#07090c', sheet: '#0c0f14', raised: '#141821', raised2: '#1d2230', edge1: '#171b25', edge2: '#12151d', edge3: '#0e1117', track: '#2a303c', ink: '#e8ebf1', ink2: '#b4bcc8', ink3: '#8a93a2', line: 'rgba(255, 255, 255, 0.07)', accent: '#93a6ff', accentText: '#a3b3ff', onAccent: '#0a1240', hi: '#ff8f80', hiText: '#ffa094', ok: '#5fd49a', elev: 'inset 0 1px 0 rgba(255, 255, 255, 0.045), 0 1px 2px rgba(0, 0, 0, 0.5)', elevBtn: 'inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 1px 2px rgba(0, 0, 0, 0.5)', elevBtnOff: 'inset 0 0 0 1px rgba(255, 255, 255, 0.08)', selRing: '0 0 0 1.5px #93a6ff, 0 0 0 5px rgba(147, 166, 255, 0.14), 0 0 28px rgba(147, 166, 255, 0.16)', edgeRing: 'inset 0 1px 0 rgba(255, 255, 255, 0.05)', edgeRing1: 'inset 0 1px 0 rgba(255, 255, 255, 0.08)', lift: 'inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 -10px 28px rgba(0, 0, 0, 0.55)', glow: '0 0 12px rgba(147, 166, 255, 0.6)', glowInk: '0 0 10px rgba(232, 235, 241, 0.22)', glowHi: '0 0 8px rgba(255, 143, 128, 0.6)', glowOk: '0 0 8px rgba(95, 212, 154, 0.75)', ctaGlow: '0 0 20px rgba(147, 166, 255, 0.3)' };
+    }
+    return { well: '#e2e5ea', sheet: '#ffffff', raised: '#ffffff', raised2: '#ffffff', edge1: '#f9fafb', edge2: '#f1f3f5', edge3: '#e9ecef', track: '#bcc3cc', ink: '#14181d', ink2: '#424a54', ink3: '#5a636e', line: '#dde1e6', accent: '#2d46c0', accentText: '#2d46c0', onAccent: '#ffffff', hi: '#c0271c', hiText: '#b0241a', ok: '#1f8a55', elev: '0 0 0 1px #bcc3cc', elevBtn: '0 0 0 1px #bcc3cc', elevBtnOff: '0 0 0 1px #dde1e6', selRing: '0 0 0 2px #2d46c0', edgeRing: '0 0 0 1px #d3d8de', edgeRing1: '0 0 0 1px #bcc3cc', lift: '0 -10px 28px rgba(20, 24, 29, 0.10)', glow: 'none', glowInk: 'none', glowHi: 'none', glowOk: '0 0 0 3px #d3eedf', ctaGlow: 'none' };
+  }
+}
+</script>
+</body>
+</html>

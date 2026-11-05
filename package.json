@@ -1,0 +1,67 @@
+{
+  "name": "agent-inbox",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A phone-first inbox where coding agents ask a human for decisions: a Cloudflare Worker + D1 web app, a zero-dependency CLI and agent skills.",
+  "keywords": [
+    "ai-agents",
+    "coding-agents",
+    "claude-code",
+    "human-in-the-loop",
+    "inbox",
+    "decisions",
+    "cli",
+    "cloudflare-workers",
+    "cloudflare-d1",
+    "pwa"
+  ],
+  "homepage": "https://github.com/ilias-t/agent-inbox#readme",
+  "bugs": {
+    "url": "https://github.com/ilias-t/agent-inbox/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ilias-t/agent-inbox.git"
+  },
+  "license": "FSL-1.1-MIT",
+  "type": "module",
+  "bin": {
+    "agent-inbox": "bin/agent-inbox.mjs"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc -p tsconfig.worker.json && tsc -p tsconfig.app.json",
+    "test": "vitest run",
+    "check": "npm run typecheck && npm test && npm run build",
+    "e2e": "tsc -p tsconfig.e2e.json && playwright test",
+    "e2e:ui": "playwright test --ui",
+    "db:migrate:local": "wrangler d1 migrations apply agent-inbox --local",
+    "db:migrate:remote": "wrangler d1 migrations apply agent-inbox --remote",
+    "seed:local": "node scripts/seed.mjs --local",
+    "worker:dev": "npm run build && npm run db:migrate:local && wrangler dev",
+    "deploy": "npm run check && npm run db:migrate:remote && wrangler deploy",
+    "contrast": "node scripts/contrast.mjs"
+  },
+  "engines": {
+    "node": ">=22.9.0"
+  },
+  "dependencies": {
+    "jose": "^6.2.12"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "^1.5.1",
+    "@cloudflare/workers-types": "^5.20261007.1",
+    "@fontsource-variable/geist-mono": "^5.3.0",
+    "@fontsource-variable/instrument-sans": "^5.3.0",
+    "@playwright/test": "1.63.0",
+    "@types/node": "^22.20.5",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.7",
+    "vitest": "~4.1.12",
+    "wrangler": "^4.157.0"
+  },
+  "overrides": {
+    "sharp": "^0.35.5"
+  }
+}

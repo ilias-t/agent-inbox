@@ -1,0 +1,33 @@
+name: Feature request
+description: Suggest something agent-inbox should do.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check docs/ideas.md first: it lists ideas already considered.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What you're trying to do with your agents or your inbox, and what gets in the way today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you'd like
+      description: The behaviour you have in mind. For CLI or API changes, the command or request you'd want to run.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and workarounds
+      description: Anything you've tried or considered instead.
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contributing
+      options:
+        - label: I'd like to send a pull request for this.

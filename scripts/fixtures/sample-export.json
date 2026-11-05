@@ -1,0 +1,338 @@
+{
+  "orchestrators": [
+    {
+      "id": "O1",
+      "version": 7,
+      "data": {
+        "goal": "Deduplicate GitHub webhook retries so one PR event updates an item once",
+        "status": "pr-open",
+        "headline": "PR #12 open, CI green, waiting on review",
+        "motivation": "GitHub redelivers webhooks on timeouts, and every redelivery re-archived the same `pr_ready` item and fired a second push.",
+        "summary": "Delivery ids are now stored for 24h and repeats answer 200 without writing. Tests cover redelivery and out-of-order delivery. **Next:** address review comments, if any.",
+        "asks": "",
+        "pr": { "number": 12, "url": "https://github.com/ilias-t/agent-inbox/pull/12", "state": "open" },
+        "session_title": "O1 webhook dedupe",
+        "session_url": "https://claude.ai/code/cse_01exampleo1",
+        "updated_at": "2026-10-07T15:31:00.000Z"
+      }
+    },
+    {
+      "id": "O2",
+      "version": 4,
+      "data": {
+        "goal": "Make the e2e suite stop flaking on the decide flow",
+        "status": "blocked",
+        "headline": "Blocked: staging Access service token expired",
+        "motivation": "About 1 in 6 CI runs fails `decide.spec.ts` on a timing race, so green runs need a retry and nobody trusts red ones.",
+        "summary": "Found the race: the list re-renders before the decide response settles. Fix is written and passes locally 50/50. Can't verify against staging until the Access service token is renewed.",
+        "asks": "Renew the staging Access service token (see the blocker item).",
+        "session_title": "O2 e2e flake",
+        "session_url": "https://claude.ai/code/cse_01exampleo2",
+        "updated_at": "2026-10-07T15:12:00.000Z"
+      }
+    },
+    {
+      "id": "O3",
+      "version": 3,
+      "data": {
+        "goal": "Move the change log off triggers so batch imports don't flood /api/changes",
+        "status": "running",
+        "headline": "Waiting on a design decision: keep triggers or write the log in the Worker",
+        "motivation": "Importing 400 docs produced 400 change rows, and every manager `wait` woke up for them.",
+        "summary": "Prototyped both options. Waiting on the decision before writing the migration.",
+        "asks": "Pick an approach for the change log (decision item).",
+        "session_title": "O3 change log",
+        "session_url": "https://claude.ai/code/cse_01exampleo3",
+        "updated_at": "2026-10-07T15:20:00.000Z"
+      }
+    }
+  ],
+  "items": [
+    {
+      "id": "O3-changelog-approach",
+      "version": 3,
+      "data": {
+        "type": "decision",
+        "title": "Change log: keep D1 triggers or write rows in the Worker?",
+        "summary": "O3 needs one call before writing the migration. Recommendation: keep triggers and tag import writes so `wait` ignores them.",
+        "context": "Every write to `docs` appends a row to `changes` through a trigger, so no code path can forget it. The import script writes hundreds of docs in one go and each one shows up in `/api/changes`.\n\nO3 prototyped two fixes:\n\n1. Keep the triggers; the import sets `updated_by = 'import:artifact'` and `wait --human` already skips non-human actors.\n2. Drop the triggers and append change rows from the Worker's write helpers.",
+        "question": "Which change-log approach should O3 implement?",
+        "options": [
+          {
+            "id": "keep-triggers",
+            "label": "Keep triggers, filter by actor",
+            "description": "No schema change; imports stay visible in the log.",
+            "consequence": "O3 adds a test that `wait --human` ignores import rows and closes the task today.",
+            "tradeoff": "The log keeps growing with bulk writes; needs a prune job later.",
+            "reversible": true
+          },
+          {
+            "id": "worker-writes",
+            "label": "Write change rows in the Worker",
+            "description": "Triggers dropped; each write helper appends its own row.",
+            "consequence": "O3 writes a migration and touches every write path (about a day).",
+            "tradeoff": "A future write path can forget to log, and the UI would miss updates.",
+            "reversible": false
+          }
+        ],
+        "recommendation": {
+          "option": "keep-triggers",
+          "confidence": "high",
+          "why": "The flood only affects consumers that don't filter by actor, and the manager's wake path already does. Triggers keep the log complete by construction."
+        },
+        "cost_of_waiting": "O3 is idle until this is decided.",
+        "evidence": [
+          { "label": "O3 prototype notes", "url": "https://github.com/ilias-t/agent-inbox/issues/14" },
+          { "label": "Trigger definitions", "url": "https://github.com/ilias-t/agent-inbox/blob/main/migrations/0001_init.sql" }
+        ],
+        "orchestrator": "O3",
+        "priority": "high",
+        "status": "open",
+        "source": "sweep:O3",
+        "qa_pending": true,
+        "qa_last_at": "2026-10-07T15:36:00.000Z",
+        "created_at": "2026-10-07T15:20:00.000Z",
+        "updated_at": "2026-10-07T15:36:00.000Z"
+      }
+    },
+    {
+      "id": "p-ntfy-digest",
+      "version": 4,
+      "data": {
+        "type": "proposal",
+        "title": "Send a daily ntfy digest at 17:45 ET",
+        "summary": "**Goal:** one push at the end of the day listing what still waits on you. **Source:** your Slack ask on Oct 6. **Size:** S. **Why now:** items piled up overnight twice this week. **Overlap:** none.",
+        "context": "Today ntfy fires per item. On busy days that's a dozen pushes, and on quiet days nothing reminds you of the two items left open.",
+        "question": "Start an orchestrator on the end-of-day digest?",
+        "recommendation": {
+          "option": "approve",
+          "confidence": "medium",
+          "why": "Small change in the Worker's scheduled handler; easy to turn off with one variable."
+        },
+        "cost_of_waiting": "Open items keep slipping overnight.",
+        "evidence": [{ "label": "Slack ask", "url": "https://example.slack.com/archives/C000000/p1759780000000000" }],
+        "priority": "normal",
+        "status": "open",
+        "source": "scout:slack",
+        "qa_pending": false,
+        "qa_last_at": "2026-10-07T14:02:00.000Z",
+        "qa_answered_at": "2026-10-07T14:10:00.000Z",
+        "created_at": "2026-10-07T13:50:00.000Z",
+        "updated_at": "2026-10-07T14:10:00.000Z"
+      }
+    },
+    {
+      "id": "O2-retry-budget",
+      "version": 1,
+      "data": {
+        "type": "auto_decided",
+        "title": "Raised the e2e retry budget from 1 to 2 while the flake fix lands",
+        "summary": "CI was failing every sixth run on the known race. Two retries keep main green until O2's fix merges; the change reverts with the fix.",
+        "options": [
+          { "id": "retry-2", "label": "Retry twice until the fix merges" },
+          { "id": "retry-1", "label": "Keep one retry" }
+        ],
+        "decision": {
+          "choice": "retry-2",
+          "note": "Temporary; reverted in the same PR as the race fix.",
+          "decided_at": "2026-10-07T12:30:00.000Z"
+        },
+        "orchestrator": "O2",
+        "priority": "low",
+        "status": "open",
+        "source": "sweep:O2",
+        "created_at": "2026-10-07T12:30:00.000Z",
+        "updated_at": "2026-10-07T12:30:00.000Z"
+      }
+    },
+    {
+      "id": "O1-pr-ready",
+      "version": 2,
+      "data": {
+        "type": "pr_ready",
+        "title": "PR #12: dedupe webhook redeliveries is ready for review",
+        "summary": "CI green, 9 files, +210/-34. Stores `X-GitHub-Delivery` ids for 24h.",
+        "links": [{ "label": "PR #12", "url": "https://github.com/ilias-t/agent-inbox/pull/12" }],
+        "orchestrator": "O1",
+        "priority": "normal",
+        "status": "open",
+        "source": "sweep:O1",
+        "pr_state": "open",
+        "created_at": "2026-10-07T15:31:00.000Z",
+        "updated_at": "2026-10-07T15:31:00.000Z"
+      }
+    },
+    {
+      "id": "O2-blocked-staging-token",
+      "version": 1,
+      "data": {
+        "type": "blocker",
+        "title": "Staging Access service token expired",
+        "summary": "O2 can't run the e2e suite against staging until the token is renewed in the Cloudflare dashboard.",
+        "context": "The Access service token `e2e-staging` expired on Oct 6. Agents can't create Access tokens; it needs an account admin.",
+        "question": "Can you renew the `e2e-staging` service token and update the CI secret?",
+        "options": [
+          {
+            "id": "renewed",
+            "label": "Renewed it",
+            "consequence": "O2 reruns the suite and opens its PR.",
+            "reversible": true
+          },
+          {
+            "id": "skip-staging",
+            "label": "Skip staging, verify locally",
+            "consequence": "O2 opens the PR with local evidence only.",
+            "tradeoff": "The race might still show up on staging's slower runners.",
+            "reversible": true
+          }
+        ],
+        "recommendation": { "option": "renewed", "confidence": "high", "why": "The race is timing-dependent; staging is where it reproduces." },
+        "cost_of_waiting": "O2 stays blocked; CI keeps relying on the retry budget.",
+        "evidence": [{ "label": "CI run with 403", "url": "https://github.com/ilias-t/agent-inbox/actions/runs/1234567890" }],
+        "orchestrator": "O2",
+        "priority": "high",
+        "status": "open",
+        "source": "sweep:O2",
+        "created_at": "2026-10-07T15:12:00.000Z",
+        "updated_at": "2026-10-07T15:12:00.000Z"
+      }
+    },
+    {
+      "id": "i-d1-usage",
+      "version": 1,
+      "data": {
+        "type": "info",
+        "title": "D1 usage this week: 0.4% of the free read quota",
+        "summary": "Long-polls from `wait` are the bulk of reads (about 3k/day). Nothing to do.",
+        "priority": "low",
+        "status": "open",
+        "source": "manager",
+        "created_at": "2026-10-07T11:00:00.000Z",
+        "updated_at": "2026-10-07T11:00:00.000Z"
+      }
+    },
+    {
+      "id": "p-linear-webhook",
+      "version": 3,
+      "data": {
+        "type": "proposal",
+        "title": "Close items when their Linear ticket is done",
+        "summary": "**Goal:** a `/hooks/linear` endpoint that archives items linked to a completed ticket. **Size:** M. **Overlap:** none.",
+        "question": "Start an orchestrator on the Linear webhook?",
+        "recommendation": { "option": "approve", "confidence": "medium", "why": "Mirrors the GitHub hook; removes a manual archive step." },
+        "priority": "normal",
+        "status": "decided",
+        "decision": { "choice": "approve", "note": "Go, but keep it behind a variable.", "decided_at": "2026-10-07T15:38:00.000Z", "by": "human:you@example.com" },
+        "source": "scout:linear",
+        "created_at": "2026-10-07T10:05:00.000Z",
+        "updated_at": "2026-10-07T15:38:05.000Z"
+      }
+    },
+    {
+      "id": "p-stale-branches",
+      "version": 4,
+      "data": {
+        "type": "proposal",
+        "title": "Prune merged orchestrator branches weekly",
+        "summary": "**Goal:** delete local `o<N>-*` branches whose PR merged. **Size:** S.",
+        "priority": "low",
+        "status": "processing",
+        "decision": { "choice": "approve", "decided_at": "2026-10-07T14:40:00.000Z", "by": "human:you@example.com" },
+        "source": "manager",
+        "created_at": "2026-10-07T09:30:00.000Z",
+        "updated_at": "2026-10-07T15:33:00.000Z"
+      }
+    },
+    {
+      "id": "O1-scope",
+      "version": 3,
+      "data": {
+        "type": "decision",
+        "title": "Should O1 also dedupe ntfy action callbacks?",
+        "question": "Widen O1's scope to the ntfy decide hook?",
+        "options": [
+          { "id": "yes", "label": "Yes, same PR" },
+          { "id": "no", "label": "No, separate task" }
+        ],
+        "recommendation": { "option": "no", "confidence": "high", "why": "The ntfy hook is already idempotent through the open-status check." },
+        "orchestrator": "O1",
+        "priority": "normal",
+        "status": "archived",
+        "decision": { "choice": "no", "decided_at": "2026-10-07T10:20:00.000Z", "by": "human:you@example.com" },
+        "source": "sweep:O1",
+        "created_at": "2026-10-07T09:50:00.000Z",
+        "updated_at": "2026-10-07T10:25:00.000Z"
+      }
+    }
+  ],
+  "items/O3-changelog-approach/qa": [
+    {
+      "id": "m-1759851360000-a1b2",
+      "version": 1,
+      "data": {
+        "role": "user",
+        "text": "How big does the change log get if we keep triggers? Do we need the prune job before shipping?",
+        "created_at": "2026-10-07T15:36:00.000Z",
+        "by": "human:you@example.com"
+      }
+    }
+  ],
+  "items/p-ntfy-digest/qa": [
+    {
+      "id": "m-1759845720000-c3d4",
+      "version": 1,
+      "data": {
+        "role": "user",
+        "text": "Would it skip the push on days with nothing open?",
+        "created_at": "2026-10-07T14:02:00.000Z",
+        "by": "human:you@example.com"
+      }
+    },
+    {
+      "id": "m-1759846200000-e5f6",
+      "version": 1,
+      "data": {
+        "role": "manager",
+        "text": "Yes. The digest only sends when at least one item is open and waiting on you; quiet days stay silent.",
+        "created_at": "2026-10-07T14:10:00.000Z",
+        "by": "token:manager"
+      }
+    }
+  ],
+  "meta": [
+    {
+      "id": "manager",
+      "version": 41,
+      "data": {
+        "last_tick": "2026-10-07T15:33:00.000Z",
+        "last_pickup": "2026-10-07T15:33:00.000Z",
+        "next_tick": "2026-10-07T15:43:00.000Z",
+        "digest": "- **O3** waits on the change-log decision (recommend: keep triggers).\n- **O2** is blocked on the staging Access token.\n- **O1** PR #12 is ready for review.\n- 1 proposal waiting: daily ntfy digest.",
+        "tick_requested_at": "2026-10-07T13:00:00.000Z",
+        "tick_requested_note": null
+      }
+    },
+    {
+      "id": "lease",
+      "version": 120,
+      "data": {
+        "holder_session_id": "seed-manager-session",
+        "holder_title": "Manager (seed data)",
+        "holder_url": "https://claude.ai/code/cse_01examplemgr",
+        "acquired_at": "2026-10-07T06:00:00.000Z",
+        "heartbeat_at": "2026-10-07T07:00:00.000Z",
+        "expires_at": "2026-10-07T07:25:00.000Z"
+      }
+    },
+    {
+      "id": "schedule",
+      "version": 1,
+      "data": {
+        "work_hours": "10:00-18:00 Mon-Fri",
+        "timezone": "America/New_York",
+        "pickup_interval_min": 10,
+        "sweep_interval_min": 30
+      }
+    }
+  ]
+}

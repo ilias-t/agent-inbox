@@ -1,0 +1,24 @@
+/* Bundled web fonts: same-origin, so the CSP stays 'self' and the offline shell has them too.
+   Only the latin subset of each, copied from @fontsource-variable/{instrument-sans,geist-mono}/wght.css
+   (same family names, axis and unicode-range). Every glyph the UI itself writes is in it, or (→ ← ⌘) in
+   no subset at all; the other subsets (latin-ext, Cyrillic, Vietnamese, box drawing) only ever served
+   pasted content, which falls back to the system font for those characters. Leaving them out keeps
+   them off the build, the service worker's precache and every install's download. Instrument Sans
+   is the UI face (no italic in v1); Geist Mono is kept for code, secrets and emails. */
+@font-face {
+  font-family: "Instrument Sans Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400 700;
+  src: url("@fontsource-variable/instrument-sans/files/instrument-sans-latin-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Geist Mono Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("@fontsource-variable/geist-mono/files/geist-mono-latin-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}

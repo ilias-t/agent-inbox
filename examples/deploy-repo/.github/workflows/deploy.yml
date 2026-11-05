@@ -1,0 +1,39 @@
+# Deploys one agent-inbox instance from this private deploy repo. Copy this file to
+# .github/workflows/deploy.yml in a new private repo, set its secrets and variables
+# (examples/deploy-repo/README.md in agent-inbox), and replace the <...> in `uses:` below.
+#
+# Every push to main deploys, so bumping the pinned commit is how you ship a newer agent-inbox;
+# rerun it any time from the Actions tab.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deploy at a time; a newer one waits for the running deploy instead of
+# cancelling it halfway through migrations.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # The agent-inbox commit to deploy: the action's steps and the code it deploys both come from
+      # it. Pin a full commit SHA and note the version beside it.
+      - uses: <owner>/agent-inbox/.github/actions/deploy@<full commit sha> # <version or date>
+        with:
+          cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          cloudflare-account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          worker-name: ${{ vars.WORKER_NAME }} # empty means agent-inbox
+          d1-database-id: ${{ vars.D1_DATABASE_ID }}
+          access-team-domain: ${{ vars.ACCESS_TEAM_DOMAIN }}
+          access-aud: ${{ vars.ACCESS_AUD }}
+          public-url: ${{ vars.PUBLIC_URL }}
+          extra-vars: ${{ vars.EXTRA_VARS }} # optional JSON object, e.g. {"CHANGES_RETENTION_DAYS":"60"}

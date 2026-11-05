@@ -1,0 +1,220 @@
+# Deploys one agent-inbox instance: checks, a Time Travel bookmark, D1 migrations, `wrangler deploy`,
+# then a smoke test. The same steps as `npm run deploy`, plus the smoke test. docs/deploy.md has the setup.
+#
+# It deploys the agent-inbox code it came with. Used from another repo
+# (`uses: <owner>/agent-inbox/.github/actions/deploy@<commit sha>`), GitHub downloads the whole repo
+# at that commit, and the action deploys that tree: one pin decides both the steps and the code.
+# Used from this repo after actions/checkout (`uses: ./.github/actions/deploy`), it deploys the checkout.
+#
+# Concurrency and timeouts belong to the calling job (one deploy per instance at a time, never
+# cancelled halfway through migrations): see examples/deploy-repo.
+name: Deploy agent-inbox
+description: Check, migrate D1 and deploy one agent-inbox instance to Cloudflare, then smoke-test it.
+
+inputs:
+  cloudflare-api-token:
+    description: Cloudflare API token (Workers Scripts Edit, D1 Edit). When empty, the action runs the checks and skips the deploy with a notice.
+    required: false
+    default: ""
+  cloudflare-account-id:
+    description: Cloudflare account id.
+    required: false
+    default: ""
+  worker-name:
+    description: Worker name; also the first label of the workers.dev host.
+    required: false
+    default: agent-inbox
+  d1-database-id:
+    description: The instance's D1 database id.
+    required: false
+    default: ""
+  access-team-domain:
+    description: Cloudflare Access team domain, <team>.cloudflareaccess.com.
+    required: false
+    default: ""
+  access-aud:
+    description: AUD tag of the Access application that covers the whole host.
+    required: false
+    default: ""
+  public-url:
+    description: Public base URL, https://<host>.
+    required: false
+    default: ""
+  extra-vars:
+    description: Optional JSON object of more Worker vars, e.g. {"CHANGES_RETENTION_DAYS":"60"}.
+    required: false
+    default: ""
+  wrangler-config:
+    description: Instead of the values above, an existing wrangler config file in the code's root, used as is.
+    required: false
+    default: ""
+  node-version:
+    description: Node.js version.
+    required: false
+    default: 22.x
+
+outputs:
+  public-url:
+    description: The deployed instance's PUBLIC_URL (empty when the deploy was skipped).
+    value: ${{ steps.smoke.outputs.public-url }}
+
+runs:
+  using: composite
+  steps:
+    # The code root is three levels above this file. From another repo that is GitHub's download of
+    # this repo, which is copied into the runner's temp dir to build in; from this repo it is the checkout.
+    - name: Locate the code
+      id: src
+      shell: bash
+      run: |
+        root=$(cd "$GITHUB_ACTION_PATH/../../.." && pwd)
+        if [ "$root" = "$(cd "$GITHUB_WORKSPACE" && pwd)" ]; then
+          dir=$root
+          local=true
+        else
+          dir=$RUNNER_TEMP/agent-inbox
+          rm -rf "$dir" && mkdir -p "$dir" && cp -a "$root/." "$dir/"
+          local=false
+        fi
+        echo "dir=$dir" >> "$GITHUB_OUTPUT"
+        echo "local=$local" >> "$GITHUB_OUTPUT"
+        echo "Deploying agent-inbox from $dir"
+
+    # npm's cache needs the lockfile inside the workspace, so only a checkout gets it.
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: ${{ steps.src.outputs.local == 'true' && 'npm' || '' }}
+
+    - name: Install
+      shell: bash
+      working-directory: ${{ steps.src.outputs.dir }}
+      run: npm ci
+
+    - name: Check
+      shell: bash
+      working-directory: ${{ steps.src.outputs.dir }}
+      run: npm run check
+
+    # Until the token is set, a deploy only runs the checks.
+    - name: Check Cloudflare credentials
+      id: creds
+      shell: bash
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ inputs.cloudflare-api-token }}
+      run: |
+        if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+          echo "::notice::The Cloudflare API token is not set; skipping migrations and deploy (see docs/deploy.md)."
+          echo "ready=false" >> "$GITHUB_OUTPUT"
+        else
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+        fi
+
+    # The instance's wrangler config: the file named by wrangler-config, or one generated from
+    # wrangler.example.jsonc and the instance inputs. Any missing value fails here, before migrations.
+    - name: Wrangler config
+      id: config
+      if: steps.creds.outputs.ready == 'true'
+      shell: bash
+      working-directory: ${{ steps.src.outputs.dir }}
+      env:
+        WRANGLER_CONFIG: ${{ inputs.wrangler-config }}
+        WORKER_NAME: ${{ inputs.worker-name }}
+        D1_DATABASE_ID: ${{ inputs.d1-database-id }}
+        ACCESS_TEAM_DOMAIN: ${{ inputs.access-team-domain }}
+        ACCESS_AUD: ${{ inputs.access-aud }}
+        PUBLIC_URL: ${{ inputs.public-url }}
+        EXTRA_VARS: ${{ inputs.extra-vars }}
+      run: |
+        if [ -n "$WRANGLER_CONFIG" ]; then
+          if [ -n "$D1_DATABASE_ID$ACCESS_TEAM_DOMAIN$ACCESS_AUD$PUBLIC_URL$EXTRA_VARS" ]; then
+            echo "::error::Pass wrangler-config or the instance values, not both."
+            exit 1
+          fi
+          case "$WRANGLER_CONFIG" in
+            /* | */* | .*)
+              echo "::error::wrangler-config must be a file name in the code's root, like wrangler.jsonc: $WRANGLER_CONFIG"
+              exit 1 ;;
+          esac
+          if [ ! -f "$WRANGLER_CONFIG" ]; then
+            echo "::error::wrangler-config $WRANGLER_CONFIG is not a file in the code's root."
+            exit 1
+          fi
+          config=$WRANGLER_CONFIG
+        else
+          config=wrangler.deploy.jsonc
+          node scripts/wrangler-config.mjs --out "$config" --force
+        fi
+        echo "path=$(pwd)/$config" >> "$GITHUB_OUTPUT"
+
+    # The database's Time Travel bookmark before this deploy's migrations, in the log: restoring to it
+    # undoes them (docs/deploy.md, "Backups and restore"). Logged only; a failure doesn't stop the deploy.
+    - name: Bookmark the database
+      if: steps.creds.outputs.ready == 'true'
+      shell: bash
+      working-directory: ${{ steps.src.outputs.dir }}
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ inputs.cloudflare-api-token }}
+        CLOUDFLARE_ACCOUNT_ID: ${{ inputs.cloudflare-account-id }}
+        CONFIG: ${{ steps.config.outputs.path }}
+      run: npx wrangler d1 time-travel info agent-inbox --config "$CONFIG" || echo "::warning::Couldn't log the Time Travel bookmark; deploying anyway."
+
+    - name: Apply D1 migrations
+      if: steps.creds.outputs.ready == 'true'
+      shell: bash
+      working-directory: ${{ steps.src.outputs.dir }}
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ inputs.cloudflare-api-token }}
+        CLOUDFLARE_ACCOUNT_ID: ${{ inputs.cloudflare-account-id }}
+        CONFIG: ${{ steps.config.outputs.path }}
+      run: npx wrangler d1 migrations apply agent-inbox --remote --config "$CONFIG"
+
+    - name: Deploy Worker
+      if: steps.creds.outputs.ready == 'true'
+      shell: bash
+      working-directory: ${{ steps.src.outputs.dir }}
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ inputs.cloudflare-api-token }}
+        CLOUDFLARE_ACCOUNT_ID: ${{ inputs.cloudflare-account-id }}
+        CONFIG: ${{ steps.config.outputs.path }}
+      run: npx wrangler deploy --config "$CONFIG"
+
+    # /agent/api/me without a token answers 401 "Bearer token required": the Worker is up and the
+    # Access bypass for /agent still holds. Then /agent/api/health must name the newest file in
+    # migrations/: the new Worker reads D1, and the migrations it was built with are applied.
+    - name: Smoke test
+      id: smoke
+      if: steps.creds.outputs.ready == 'true'
+      shell: bash
+      working-directory: ${{ steps.src.outputs.dir }}
+      env:
+        CONFIG: ${{ steps.config.outputs.path }}
+      run: |
+        PUBLIC_URL=$(node --input-type=module -e "
+          import { unstable_readConfig } from 'wrangler';
+          console.log(unstable_readConfig({ config: process.env.CONFIG }).vars?.PUBLIC_URL ?? '');
+        " | tail -n 1)
+        if [ -z "$PUBLIC_URL" ]; then
+          echo "::error::PUBLIC_URL is missing from the deployed config's vars"
+          exit 1
+        fi
+        echo "public-url=$PUBLIC_URL" >> "$GITHUB_OUTPUT"
+        for attempt in 1 2 3 4 5 6; do
+          code=$(curl -s -o /dev/null -w '%{http_code}' "$PUBLIC_URL/agent/api/me" || true)
+          echo "attempt $attempt: GET $PUBLIC_URL/agent/api/me -> $code"
+          if [ "$code" = "401" ]; then break; fi
+          sleep 10
+        done
+        if [ "$code" != "401" ]; then
+          echo "::error::Expected 401 from $PUBLIC_URL/agent/api/me, got $code"
+          exit 1
+        fi
+        want=$(ls migrations/*.sql | sort | tail -n 1 | xargs basename)
+        for attempt in 1 2 3 4 5 6; do
+          got=$(curl -s "$PUBLIC_URL/agent/api/health" | jq -r 'select(.ok == true) | .migration' 2>/dev/null || true)
+          echo "attempt $attempt: GET $PUBLIC_URL/agent/api/health -> migration ${got:-none} (want $want)"
+          if [ "$got" = "$want" ]; then exit 0; fi
+          sleep 10
+        done
+        echo "::error::$PUBLIC_URL/agent/api/health didn't report $want"
+        exit 1

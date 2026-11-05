@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.wrangler/
+.dev.vars
+*.log
+.DS_Store
+.claude/worktrees/
+.cloudflare/
+.playwright-mcp/
+playwright-report/
+test-results/
+# Your own deployment's config (start from wrangler.example.jsonc; tests use wrangler.test.jsonc)
+wrangler.jsonc
+# Written by scripts/wrangler-config.mjs (the deploy action)
+wrangler.deploy.jsonc

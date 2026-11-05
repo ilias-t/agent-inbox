@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Refined history</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wdth,wght@0,75..100,400..700;1,75..100,400..700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#2d46c0}a:hover{color:#1f3399}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; position: relative; overflow: hidden; background: {{bg}}; color: {{ink}}; font-family: 'Instrument Sans', sans-serif; font-size: 15px; line-height: 20px; font-variant-numeric: tabular-nums;">
+
+  <div style="padding: 4px 16px 0; display: flex; flex-direction: column;">
+
+    <header style="display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 44px;">
+      <h1 style="margin: 0; font-size: 22px; line-height: 28px; font-weight: 600; letter-spacing: -0.02em;">History</h1>
+      <span role="status" style="font-size: 14px; line-height: 20px; color: {{ink3}};">8 of 38 loaded</span>
+    </header>
+
+    <label style="margin-top: 8px; height: 44px; box-sizing: border-box; padding: 0 12px; border: 1px solid {{lineStrong}}; border-radius: 12px; background: {{surface}}; display: flex; align-items: center; gap: 10px;">
+      <span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;">Search history</span>
+      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{ink3}}" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"></circle><path d="M16 16l4.5 4.5"></path></svg>
+      <input type="search" placeholder="Titles, notes, choices, O3…" style="flex: 1; min-width: 0; height: 40px; padding: 0; border: 0; outline-offset: 2px; background: transparent; color: {{ink}}; font: inherit; font-size: 16px;">
+    </label>
+
+    <div role="group" aria-label="Filter history" style="margin-top: 8px; display: flex; gap: 4px;">
+      <button type="button" aria-pressed="true" style="min-height: 44px; padding: 0 14px; border: 1px solid {{ink}}; border-radius: 22px; background: {{ink}}; color: {{bg}}; font: inherit; font-size: 14px; font-weight: 600;">All</button>
+      <button type="button" aria-pressed="false" style="min-height: 44px; padding: 0 12px; border: 1px solid {{lineStrong}}; border-radius: 22px; background: transparent; color: {{ink2}}; font: inherit; font-size: 14px; font-weight: 500;">By me</button>
+      <button type="button" aria-pressed="false" style="min-height: 44px; padding: 0 12px; border: 1px solid {{lineStrong}}; border-radius: 22px; background: transparent; color: {{ink2}}; font: inherit; font-size: 14px; font-weight: 500;">Auto-decided</button>
+      <button type="button" aria-pressed="false" style="min-height: 44px; padding: 0 12px; border: 1px solid {{lineStrong}}; border-radius: 22px; background: transparent; color: {{ink2}}; font: inherit; font-size: 14px; font-weight: 500;">Overridden</button>
+    </div>
+
+    <section aria-labelledby="d0" style="display: flex; flex-direction: column;">
+      <h2 id="d0" style="margin: 0; height: 28px; box-sizing: border-box; padding-bottom: 5px; display: flex; align-items: flex-end; font-size: 13px; line-height: 16px; font-weight: 600; color: {{ink2}};">Today</h2>
+      <a href="Refined-Focus.dc.html" style="display: grid; grid-template-columns: 16px 1fr 40px; column-gap: 8px; padding: 8px 0; border-top: 1px solid {{line}}; color: {{ink}}; text-decoration: none;">
+        <span style="padding-top: 3px; display: flex;"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="{{accent}}" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="8" stroke="{{lineStrong}}"></circle><path d="M12 4a8 8 0 0 1 8 8"></path></svg></span>
+        <span style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+          <span style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Use D1 batch writes for the state delta?</span>
+          <span style="display: flex; align-items: center; gap: 10px; white-space: nowrap; overflow: hidden; font-size: 13px; line-height: 18px; color: {{ink3}};"><span style="flex: none; font-weight: 600; color: {{accentText}};">Being handled</span><span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; color: {{ink}};">Batch</span><span style="flex: none;">O3</span><span style="font-weight: 600; color: {{accentText}};">You</span></span>
+        </span>
+        <span style="text-align: right; font-size: 13px; color: {{ink3}};">13:40</span>
+      </a>
+      <a href="Refined-Focus.dc.html" style="display: grid; grid-template-columns: 16px 1fr 40px; column-gap: 8px; padding: 8px 0; border-top: 1px solid {{line}}; color: {{ink}}; text-decoration: none;">
+        <span style="padding-top: 3px; display: flex;"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="{{ink3}}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></span>
+        <span style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+          <span style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">PR #11: snooze presets in the item sheet</span>
+          <span style="display: flex; align-items: center; gap: 10px; white-space: nowrap; overflow: hidden; font-size: 13px; line-height: 18px; color: {{ink3}};"><span style="flex: none; font-weight: 600; color: {{ink2}};">Decided</span><span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; color: {{ink}};">Merge</span><span style="flex: none;">O1</span><span style="font-weight: 600; color: {{accentText}};">You</span></span>
+        </span>
+        <span style="text-align: right; font-size: 13px; color: {{ink3}};">12:58</span>
+      </a>
+      <a href="Refined-Focus.dc.html" style="display: grid; grid-template-columns: 16px 1fr 40px; column-gap: 8px; padding: 8px 0; border-top: 1px solid {{line}}; color: {{ink}}; text-decoration: none;">
+        <span style="padding-top: 3px; display: flex;"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="{{ink2}}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 8H9a5 5 0 0 0 0 10h4"></path><path d="M16 4l4 4-4 4"></path></svg></span>
+        <span style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+          <span style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Skipped the flaky Safari job on PRs</span>
+          <span style="display: flex; align-items: center; gap: 10px; white-space: nowrap; overflow: hidden; font-size: 13px; line-height: 18px; color: {{ink3}};"><span style="flex: none; font-weight: 600; color: {{ink2}};">Overridden</span><span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; color: {{ink}};">Quarantine one test</span><span style="flex: none;">O2</span><span style="font-weight: 600; color: {{accentText}};">You</span></span>
+        </span>
+        <span style="text-align: right; font-size: 13px; color: {{ink3}};">11:20</span>
+      </a>
+      <a href="Refined-Focus.dc.html" style="display: grid; grid-template-columns: 16px 1fr 40px; column-gap: 8px; padding: 8px 0; border-top: 1px solid {{line}}; color: {{ink}}; text-decoration: none;">
+        <span style="padding-top: 3px; display: flex;"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="{{ink3}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"></rect><path d="M8.5 12.5l2.5 2.5 4.5-5"></path></svg></span>
+        <span style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+          <span style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Pinned wrangler to 3.78 until v4 lands</span>
+          <span style="display: flex; align-items: center; gap: 10px; white-space: nowrap; overflow: hidden; font-size: 13px; line-height: 18px; color: {{ink3}};"><span style="flex: none; font-weight: 600; color: {{ink2}};">Accepted</span><span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; color: {{ink}};">Pin 3.78</span><span style="flex: none;">O5</span><span>Sam</span></span>
+        </span>
+        <span style="text-align: right; font-size: 13px; color: {{ink3}};">10:05</span>
+      </a>
+    </section>
+    <section aria-labelledby="d1" style="display: flex; flex-direction: column;">
+      <h2 id="d1" style="margin: 0; height: 28px; box-sizing: border-box; padding-bottom: 5px; display: flex; align-items: flex-end; font-size: 13px; line-height: 16px; font-weight: 600; color: {{ink2}};">Yesterday</h2>
+      <a href="Refined-Focus.dc.html" style="display: grid; grid-template-columns: 16px 1fr 40px; column-gap: 8px; padding: 8px 0; border-top: 1px solid {{line}}; color: {{ink}}; text-decoration: none;">
+        <span style="padding-top: 3px; display: flex;"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="{{ink3}}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></span>
+        <span style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+          <span style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Split the Worker routes into views/ and api/?</span>
+          <span style="display: flex; align-items: center; gap: 10px; white-space: nowrap; overflow: hidden; font-size: 13px; line-height: 18px; color: {{ink3}};"><span style="flex: none; font-weight: 600; color: {{ink2}};">Decided</span><span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; color: {{ink}};">Split now</span><span style="flex: none;">O1</span><span>Sam</span></span>
+        </span>
+        <span style="text-align: right; font-size: 13px; color: {{ink3}};">16:42</span>
+      </a>
+      <a href="Refined-Focus.dc.html" style="display: grid; grid-template-columns: 16px 1fr 40px; column-gap: 8px; padding: 8px 0; border-top: 1px solid {{line}}; color: {{ink}}; text-decoration: none;">
+        <span style="padding-top: 3px; display: flex;"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="{{ink3}}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></span>
+        <span style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+          <span style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Start an orchestrator on Web Push re-checks?</span>
+          <span style="display: flex; align-items: center; gap: 10px; white-space: nowrap; overflow: hidden; font-size: 13px; line-height: 18px; color: {{ink3}};"><span style="flex: none; font-weight: 600; color: {{ink2}};">Decided</span><span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; color: {{ink}};">Approve</span><span style="flex: none;">Manager</span><span style="font-weight: 600; color: {{accentText}};">You</span></span>
+        </span>
+        <span style="text-align: right; font-size: 13px; color: {{ink3}};">11:15</span>
+      </a>
+    </section>
+    <section aria-labelledby="d2" style="display: flex; flex-direction: column;">
+      <h2 id="d2" style="margin: 0; height: 28px; box-sizing: border-box; padding-bottom: 5px; display: flex; align-items: flex-end; font-size: 13px; line-height: 16px; font-weight: 600; color: {{ink2}};">Mon 5 Oct</h2>
+      <a href="Refined-Focus.dc.html" style="display: grid; grid-template-columns: 16px 1fr 40px; column-gap: 8px; padding: 8px 0; border-top: 1px solid {{line}}; color: {{ink}}; text-decoration: none;">
+        <span style="padding-top: 3px; display: flex;"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="{{ink3}}" stroke-width="2.2" stroke-linecap="round"><path d="M6 12h12"></path></svg></span>
+        <span style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+          <span style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Drop the legacy links field?</span>
+          <span style="display: flex; align-items: center; gap: 10px; white-space: nowrap; overflow: hidden; font-size: 13px; line-height: 18px; color: {{ink3}};"><span style="flex: none; font-weight: 600; color: {{ink2}};">Archived</span><span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; color: {{ink}};">No decision</span><span style="flex: none;">Manager</span></span>
+        </span>
+        <span style="text-align: right; font-size: 13px; color: {{ink3}};">17:30</span>
+      </a>
+      <a href="Refined-Focus.dc.html" style="display: grid; grid-template-columns: 16px 1fr 40px; column-gap: 8px; padding: 8px 0; border-top: 1px solid {{line}}; color: {{ink}}; text-decoration: none;">
+        <span style="padding-top: 3px; display: flex;"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="{{ink3}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"></rect><path d="M8.5 12.5l2.5 2.5 4.5-5"></path></svg></span>
+        <span style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+          <span style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Retried e2e once before failing the run</span>
+          <span style="display: flex; align-items: center; gap: 10px; white-space: nowrap; overflow: hidden; font-size: 13px; line-height: 18px; color: {{ink3}};"><span style="flex: none; font-weight: 600; color: {{ink2}};">Accepted</span><span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; color: {{ink}};">Retry once</span><span style="flex: none;">O5</span><span style="font-weight: 600; color: {{accentText}};">You</span></span>
+        </span>
+        <span style="text-align: right; font-size: 13px; color: {{ink3}};">09:12</span>
+      </a>
+    </section>
+
+    <button type="button" style="margin-top: 12px; min-height: 44px; border: 1px solid {{lineStrong}}; border-radius: 12px; background: {{surface}}; color: {{ink}}; font: inherit; font-size: 15px; font-weight: 600;">Load older <span style="font-weight: 500; color: {{ink3}};">30</span></button>
+
+  </div>
+
+  <nav aria-label="Main" style="position: absolute; left: 0; right: 0; bottom: 0; box-sizing: border-box; height: 64px; padding: 6px 12px 8px; background: {{bg}}; border-top: 1px solid {{line}}; display: grid; grid-template-columns: 1fr 1fr 1.7fr 1fr 1fr; gap: 4px; align-items: stretch;">
+    <a href="Main.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: {{ink3}}; text-decoration: none; font-size: 12px; line-height: 14px; font-weight: 500;">
+      <span style="position: relative; display: block; width: 22px; height: 22px;"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13l3-8h12l3 8v6H3z"></path><path d="M3 13h5l1 3h6l1-3h5"></path></svg><span role="img" aria-label="High priority waiting" style="position: absolute; top: -1px; right: -3px; width: 8px; height: 8px; border-radius: 50%; background: {{hi}}; box-shadow: 0 0 0 2px {{bg}};"></span></span>Inbox</a>
+    <button type="button" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 0; border: 0; background: transparent; color: {{ink3}}; font: inherit; font-size: 12px; line-height: 14px; font-weight: 500;">
+      <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"></path><path d="M16 4.8a3.3 3.3 0 0 1 0 6.4"></path><path d="M18 14.8c1.8.7 3 2.5 3.5 5.2"></path></svg>Team 4</button>
+    <a href="Refined-Focus.dc.html" style="display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 14px; background: {{accent}}; color: {{onAccent}}; text-decoration: none; font-size: 16px; font-weight: 600;">
+      <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="6.5"></circle><path d="M12 2v4M12 18v4M2 12h4M18 12h4"></path></svg>Focus 5</a>
+    <a href="Refined-History.dc.html" aria-current="page" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: {{ink}}; text-decoration: none; font-size: 12px; line-height: 14px; font-weight: 600;">
+      <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 12a8.5 8.5 0 1 0 2.5-6"></path><path d="M3 4v4h4"></path><path d="M12 8v4l3 2"></path></svg>History</a>
+    <button type="button" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 0; border: 0; background: transparent; color: {{ink3}}; font: inherit; font-size: 12px; line-height: 14px; font-weight: 500;">
+      <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"></path><circle cx="16" cy="7" r="2"></circle><circle cx="10" cy="17" r="2"></circle></svg>Settings</button>
+  </nav>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const dark = this.props.dark === true || this.props.dark === 'true';
+    if (dark) {
+      return { bg: '#14171c', surface: '#1c2026', ink: '#eceef2', ink2: '#bcc3cc', ink3: '#9aa3ae', line: '#2c323b', lineStrong: '#48505b', accent: '#9db0ff', onAccent: '#0e1a52', accentText: '#aebeff', hi: '#ff9b90' };
+    }
+    return { bg: '#f4f5f7', surface: '#ffffff', ink: '#14181d', ink2: '#424a54', ink3: '#5a636e', line: '#dde1e6', lineStrong: '#bcc3cc', accent: '#2d46c0', onAccent: '#ffffff', accentText: '#2d46c0', hi: '#c0271c' };
+  }
+}
+</script>
+</body>
+</html>

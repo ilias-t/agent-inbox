@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Phone · Queue</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wdth,wght@0,75..100,400..700;1,75..100,400..700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#2d46c0}a:hover{color:#1f3399}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; position: relative; overflow: hidden; background: {{bg}}; color: {{ink}}; font-family: 'Instrument Sans', sans-serif; font-size: 15px; line-height: 20px; font-variant-numeric: tabular-nums;">
+
+  <div style="padding: 4px 16px 0; display: flex; flex-direction: column;">
+
+    <header style="display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 44px;">
+      <h1 style="margin: 0; display: flex; align-items: baseline; gap: 8px; font-size: 22px; line-height: 28px; font-weight: 600; letter-spacing: -0.02em;"><span><span style="color: {{countInk}}; text-shadow: {{glow}};">5</span> need you</span> <span style="font-size: 14px; letter-spacing: 0; font-weight: 500; color: {{ink3}};">1 FYI</span></h1>
+      <div role="group" aria-label="Show items" style="display: flex; height: 44px; padding: 3px; box-sizing: border-box; border-radius: 12px; background: {{sunk}};">
+        <button type="button" aria-pressed="true" style="padding: 0 10px; border: 0; border-radius: 9px; background: {{raised2}}; box-shadow: {{elevSeg}}; color: {{ink}}; font: inherit; font-size: 14px; font-weight: 600;">All <span style="color: {{ink3}}; font-weight: 500;">6</span></button>
+        <button type="button" aria-pressed="false" style="padding: 0 10px; border: 0; border-radius: 9px; background: transparent; color: {{ink2}}; font: inherit; font-size: 14px; font-weight: 500;">Mine <span style="color: {{ink3}};">2</span></button>
+        <button type="button" aria-pressed="false" style="padding: 0 10px; border: 0; border-radius: 9px; background: transparent; color: {{ink2}}; font: inherit; font-size: 14px; font-weight: 500;">Unassigned <span style="color: {{ink3}};">4</span></button>
+      </div>
+    </header>
+
+    <section aria-label="Manager" style="margin-top: 8px; border-radius: 14px; background: {{raised}}; box-shadow: {{elevCard}};">
+      <div style="display: flex; align-items: center; gap: 10px; padding: 0 4px 0 14px;">
+        <span aria-hidden="true" style="flex: none; width: 8px; height: 8px; border-radius: 50%; background: {{ok}}; box-shadow: {{glowOk}};"></span>
+        <button type="button" aria-expanded="false" aria-label="Manager status: next pickup 14:23, last tick 7 minutes ago. Show schedule" style="flex: 1; min-width: 0; min-height: 44px; padding: 0; border: 0; background: transparent; color: {{ink}}; font: inherit; text-align: left; display: flex; align-items: baseline; gap: 8px; white-space: nowrap;">
+          <span style="font-weight: 600;">Next pickup <span style="text-shadow: {{glowInk}};">14:23</span></span>
+          <span style="font-size: 13px; color: {{ink3}};">last tick 7m ago</span>
+        </button>
+        <button type="button" style="flex: none; min-height: 44px; padding: 0 10px; border: 0; border-radius: 10px; background: transparent; color: {{accentText}}; font: inherit; font-size: 14px; font-weight: 600;">Run tick now</button>
+      </div>
+      <button type="button" aria-expanded="false" style="width: 100%; min-height: 44px; padding: 0 12px 0 14px; border: 0; border-top: 1px solid {{line}}; border-radius: 0 0 14px 14px; background: transparent; color: {{ink2}}; font: inherit; font-size: 14px; text-align: left; display: flex; align-items: center; gap: 10px;">
+        <span style="flex: none; font-weight: 600; color: {{ink}};">Digest</span>
+        <span style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">O3 waits on the change-log decision; O2 is blocked on the staging token; O1 PR #12 is ready.</span>
+        <span style="flex: none; display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: {{accentText}};"><span aria-hidden="true" style="width: 6px; height: 6px; border-radius: 50%; background: {{accent}}; box-shadow: {{glow}};"></span>New</span>
+        <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none; color: {{ink3}};"><path d="M6 9l6 6 6-6"></path></svg>
+      </button>
+    </section>
+
+    <section aria-labelledby="g-high" style="display: flex; flex-direction: column;">
+      <h2 id="g-high" style="margin: 0; height: 26px; box-sizing: border-box; padding-bottom: 5px; display: flex; align-items: flex-end; gap: 6px; font-size: 13px; line-height: 16px; font-weight: 600; color: {{hiText}};">High <span style="font-weight: 500; color: {{ink3}};">2</span></h2>
+      <a href="Main.dc.html" style="display: grid; grid-template-columns: 16px 1fr 32px; column-gap: 8px; padding: 7px 0; border-top: 1px solid {{line}}; color: {{ink}}; text-decoration: none;">
+        <span aria-hidden="true" style="margin-top: 6px; width: 8px; height: 8px; border-radius: 50%; background: {{hi}}; box-shadow: {{glowHi}};"></span>
+        <span style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+          <span style="font-weight: 500;">Keep D1 triggers, or write change rows in the Worker?</span>
+          <span style="display: flex; align-items: center; gap: 10px; white-space: nowrap; font-size: 13px; line-height: 18px; color: {{ink3}};"><span style="font-weight: 600; color: {{ink2}};">Decision</span><span>O3</span><span style="font-weight: 600; color: {{accentText}};">You</span><span style="display: inline-flex; align-items: center; gap: 5px; font-weight: 600; color: {{accentText}};"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 50%; background: {{accent}}; box-shadow: {{glow}};"></span>Answered</span></span>
+        </span>
+        <span style="text-align: right; font-size: 13px; color: {{ink3}};">31m</span>
+      </a>
+      <a href="Main.dc.html" style="display: grid; grid-template-columns: 16px 1fr 32px; column-gap: 8px; padding: 7px 0; border-top: 1px solid {{line}}; color: {{ink}}; text-decoration: none;">
+        <span aria-hidden="true" style="margin-top: 6px; width: 8px; height: 8px; border-radius: 50%; background: {{hi}}; box-shadow: {{glowHi}};"></span>
+        <span style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+          <span style="font-weight: 500;">Can you renew the e2e-staging service token?</span>
+          <span style="display: flex; align-items: center; gap: 10px; white-space: nowrap; font-size: 13px; line-height: 18px; color: {{ink3}};"><span style="font-weight: 600; color: {{ink2}};">Blocker</span><span>O2</span><span style="font-weight: 600; color: {{accentText}};">You</span></span>
+        </span>
+        <span style="text-align: right; font-size: 13px; color: {{ink3}};">27m</span>
+      </a>
+    </section>
+
+    <section aria-labelledby="g-normal" style="display: flex; flex-direction: column;">
+      <h2 id="g-normal" style="margin: 0; height: 26px; box-sizing: border-box; padding-bottom: 5px; display: flex; align-items: flex-end; gap: 6px; font-size: 13px; line-height: 16px; font-weight: 600; color: {{ink2}};">Normal <span style="font-weight: 500; color: {{ink3}};">2</span></h2>
+      <a href="Main.dc.html" style="display: grid; grid-template-columns: 16px 1fr 32px; column-gap: 8px; padding: 7px 0; border-top: 1px solid {{line}}; color: {{ink}}; text-decoration: none;">
+        <span aria-hidden="true" style="margin-top: 6px; width: 8px; height: 8px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid {{ink3}};"></span>
+        <span style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+          <span style="font-weight: 500;">Start an orchestrator on the end-of-day digest?</span>
+          <span style="display: flex; align-items: center; gap: 10px; white-space: nowrap; font-size: 13px; line-height: 18px; color: {{ink3}};"><span style="font-weight: 600; color: {{ink2}};">Proposal</span><span>Manager</span><span>Size S</span><span>From Linear</span></span>
+        </span>
+        <span style="text-align: right; font-size: 13px; color: {{ink3}};">2h</span>
+      </a>
+      <a href="Main.dc.html" style="display: grid; grid-template-columns: 16px 1fr 32px; column-gap: 8px; padding: 7px 0; border-top: 1px solid {{line}}; color: {{ink}}; text-decoration: none;">
+        <span aria-hidden="true" style="margin-top: 6px; width: 8px; height: 8px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid {{ink3}};"></span>
+        <span style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+          <span style="font-weight: 500;">PR #12: dedupe webhook deliveries</span>
+          <span style="display: flex; align-items: center; gap: 10px; white-space: nowrap; font-size: 13px; line-height: 18px; color: {{ink3}};"><span style="font-weight: 600; color: {{ink2}};">PR ready</span><span>O1</span><span style="display: inline-flex; align-items: center; gap: 4px; font-weight: 600; color: {{okText}};"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>CI green</span><span>+84 −12</span></span>
+        </span>
+        <span style="text-align: right; font-size: 13px; color: {{ink3}};">8m</span>
+      </a>
+    </section>
+
+    <section aria-labelledby="g-low" style="display: flex; flex-direction: column;">
+      <h2 id="g-low" style="margin: 0; height: 26px; box-sizing: border-box; padding-bottom: 5px; display: flex; align-items: flex-end; gap: 6px; font-size: 13px; line-height: 16px; font-weight: 600; color: {{ink2}};">Low <span style="font-weight: 500; color: {{ink3}};">1</span></h2>
+      <a href="Main.dc.html" style="display: grid; grid-template-columns: 16px 1fr 32px; column-gap: 8px; padding: 7px 0; border-top: 1px solid {{line}}; color: {{ink}}; text-decoration: none;">
+        <span aria-hidden="true" style="margin-top: 9px; width: 8px; height: 2px; border-radius: 1px; background: {{ink3}};"></span>
+        <span style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+          <span style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">D1 usage this week: 0.4% of the free read quota</span>
+          <span style="display: flex; align-items: center; gap: 10px; white-space: nowrap; font-size: 13px; line-height: 18px; color: {{ink3}};"><span style="font-weight: 600; color: {{ink2}};">Info</span><span>Manager</span></span>
+        </span>
+        <span style="text-align: right; font-size: 13px; color: {{ink3}};">5h</span>
+      </a>
+    </section>
+
+    <section aria-labelledby="g-fyi" style="display: flex; flex-direction: column;">
+      <h2 id="g-fyi" style="margin: 0; height: 26px; box-sizing: border-box; padding-bottom: 5px; display: flex; align-items: flex-end; gap: 6px; font-size: 13px; line-height: 16px; font-weight: 600; color: {{ink2}};">Decided for you <span style="font-weight: 500; color: {{ink3}};">1</span></h2>
+      <div style="display: grid; grid-template-columns: 16px 1fr; column-gap: 8px; padding: 8px 0 4px; border-top: 1px solid {{line}};">
+        <span aria-hidden="true" style="margin-top: 6px; width: 8px; height: 8px; box-sizing: border-box; border-radius: 2px; border: 1.5px solid {{ink3}};"></span>
+        <div style="display: flex; flex-direction: column; gap: 2px; min-width: 0;">
+          <a href="Main.dc.html" style="display: grid; grid-template-columns: 1fr 32px; column-gap: 8px; color: {{ink}}; text-decoration: none;"><span style="font-weight: 500;">Raised the e2e retry budget from 1 to 2 while the flake fix lands</span><span style="text-align: right; font-size: 13px; color: {{ink3}};">3h</span></a>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span style="flex: 1; display: flex; gap: 10px; white-space: nowrap; font-size: 13px; line-height: 18px; color: {{ink3}};"><span style="font-weight: 600; color: {{ink2}};">O5 chose</span><span>Retry twice</span></span>
+            <button type="button" style="min-height: 44px; padding: 0 14px; border: 0; border-radius: 10px; background: {{raised2}}; box-shadow: {{elevBtn}}; color: {{ink}}; font: inherit; font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>Looks good</button>
+            <button type="button" style="min-height: 44px; margin-right: -10px; padding: 0 10px; border: 0; border-radius: 10px; background: transparent; color: {{ink2}}; font: inherit; font-size: 14px; font-weight: 600;">Override…</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="g-snoozed" style="display: flex; flex-direction: column;">
+      <h2 id="g-snoozed" style="margin: 0;">
+        <button type="button" aria-expanded="true" style="width: 100%; height: 34px; padding: 0 0 5px; border: 0; background: transparent; color: {{ink2}}; font: inherit; font-size: 13px; line-height: 16px; font-weight: 600; display: flex; align-items: flex-end; gap: 6px; text-align: left;">Snoozed <span style="font-weight: 500; color: {{ink3}};">1</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: auto; color: {{ink3}};"><path d="M6 15l6-6 6 6"></path></svg></button>
+      </h2>
+      <div style="display: grid; grid-template-columns: 16px 1fr auto; column-gap: 8px; align-items: center; border-top: 1px solid {{line}};">
+        <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="{{ink3}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5V12l3 2"></path></svg>
+        <a href="Main.dc.html" style="display: flex; flex-direction: column; min-width: 0; padding: 4px 0; color: {{ink2}}; text-decoration: none;">
+          <span style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Upgrade wrangler to v4?</span>
+          <span style="font-size: 13px; line-height: 18px; color: {{ink3}};">until today 18:00 ET</span>
+        </a>
+        <button type="button" style="min-height: 44px; margin-right: -10px; padding: 0 10px; border: 0; border-radius: 10px; background: transparent; color: {{accentText}}; font: inherit; font-size: 14px; font-weight: 600;">Unsnooze</button>
+      </div>
+    </section>
+
+  </div>
+
+  <nav aria-label="Main" style="position: absolute; left: 0; right: 0; bottom: 0; box-sizing: border-box; height: 64px; padding: 6px 12px 8px; background: {{bar}}; box-shadow: {{barEdge}}; display: grid; grid-template-columns: 1fr 1fr 1.7fr 1fr 1fr; gap: 4px; align-items: stretch;">
+    <a href="Phone-Queue.dc.html" aria-current="page" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: {{ink}}; text-decoration: none; font-size: 12px; line-height: 14px; font-weight: 600;">
+      <span style="position: relative; display: block; width: 22px; height: 22px;"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13l3-8h12l3 8v6H3z"></path><path d="M3 13h5l1 3h6l1-3h5"></path></svg><span role="img" aria-label="High priority waiting" style="position: absolute; top: -1px; right: -3px; width: 8px; height: 8px; border-radius: 50%; background: {{hi}}; box-shadow: 0 0 0 2px {{bar}};"></span></span>Inbox</a>
+    <button type="button" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 0; border: 0; background: transparent; color: {{ink3}}; font: inherit; font-size: 12px; line-height: 14px; font-weight: 500;">
+      <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"></path><path d="M16 4.8a3.3 3.3 0 0 1 0 6.4"></path><path d="M18 14.8c1.8.7 3 2.5 3.5 5.2"></path></svg>Team 4</button>
+    <a href="Main.dc.html" style="display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 14px; background: {{accent}}; box-shadow: {{ctaGlow}}; color: {{onAccent}}; text-decoration: none; font-size: 16px; font-weight: 600;">
+      <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="6.5"></circle><path d="M12 2v4M12 18v4M2 12h4M18 12h4"></path></svg>Focus 5</a>
+    <button type="button" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 0; border: 0; background: transparent; color: {{ink3}}; font: inherit; font-size: 12px; line-height: 14px; font-weight: 500;">
+      <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 12a8.5 8.5 0 1 0 2.5-6"></path><path d="M3 4v4h4"></path><path d="M12 8v4l3 2"></path></svg>History</button>
+    <button type="button" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 0; border: 0; background: transparent; color: {{ink3}}; font: inherit; font-size: 12px; line-height: 14px; font-weight: 500;">
+      <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"></path><circle cx="16" cy="7" r="2"></circle><circle cx="10" cy="17" r="2"></circle></svg>Settings</button>
+  </nav>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const dark = this.props.dark === true || this.props.dark === 'true';
+    if (dark) {
+      return { bg: '#0c0f14', raised: '#141821', raised2: '#1d2230', sunk: '#07090c', bar: '#10131a', ink: '#e8ebf1', ink2: '#b4bcc8', ink3: '#8a93a2', countInk: '#a3b3ff', line: 'rgba(255, 255, 255, 0.07)', accent: '#93a6ff', accentText: '#a3b3ff', onAccent: '#0a1240', hi: '#ff8f80', hiText: '#ffa094', ok: '#5fd49a', okText: '#74dca8', elevCard: 'inset 0 1px 0 rgba(255, 255, 255, 0.045), 0 1px 2px rgba(0, 0, 0, 0.5)', elevSeg: 'inset 0 1px 0 rgba(255, 255, 255, 0.045), 0 1px 2px rgba(0, 0, 0, 0.5)', elevBtn: 'inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 1px 2px rgba(0, 0, 0, 0.5)', barEdge: 'inset 0 1px 0 rgba(255, 255, 255, 0.06)', glow: '0 0 14px rgba(147, 166, 255, 0.55)', glowInk: '0 0 10px rgba(232, 235, 241, 0.22)', glowHi: '0 0 8px rgba(255, 143, 128, 0.6)', glowOk: '0 0 8px rgba(95, 212, 154, 0.75)', ctaGlow: '0 0 18px rgba(147, 166, 255, 0.28)' };
+    }
+    return { bg: '#f4f5f7', raised: '#ffffff', raised2: '#ffffff', sunk: '#e6e9ed', bar: '#f4f5f7', ink: '#14181d', ink2: '#424a54', ink3: '#5a636e', countInk: '#14181d', line: '#dde1e6', accent: '#2d46c0', accentText: '#2d46c0', onAccent: '#ffffff', hi: '#c0271c', hiText: '#b0241a', ok: '#1f8a55', okText: '#17693f', elevCard: '0 0 0 1px #dde1e6', elevSeg: 'none', elevBtn: '0 0 0 1px #bcc3cc', barEdge: 'inset 0 1px 0 #dde1e6', glow: 'none', glowInk: 'none', glowHi: 'none', glowOk: '0 0 0 3px #d3eedf', ctaGlow: 'none' };
+  }
+}
+</script>
+</body>
+</html>

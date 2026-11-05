@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Refined states</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wdth,wght@0,75..100,400..700;1,75..100,400..700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#2d46c0}a:hover{color:#1f3399}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; position: relative; overflow: hidden; background: {{bg}}; color: {{ink}}; font-family: 'Instrument Sans', sans-serif; font-size: 15px; line-height: 20px; font-variant-numeric: tabular-nums; display: flex; flex-direction: column;">
+
+  <h2 id="s-offline" style="margin: 0; flex: none; height: 24px; box-sizing: border-box; padding: 0 16px; display: flex; align-items: center; background: {{sunk}}; border-bottom: 1px solid {{line}}; font-size: 12px; line-height: 16px; font-weight: 600; color: {{ink2}};">Offline, on the queue</h2>
+  <section aria-labelledby="s-offline" style="flex: none; height: 156px; overflow: hidden; display: flex; flex-direction: column;">
+    <div role="status" style="flex: none; height: 44px; padding: 0 6px 0 16px; display: flex; align-items: center; gap: 10px; background: {{inv}}; color: {{onInv}};">
+      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex: none;"><path d="M3 3l18 18"></path><path d="M8.5 8.6A5.5 5.5 0 0 0 7 19h10"></path><path d="M11.3 6.1A5.5 5.5 0 0 1 17.5 10a4.5 4.5 0 0 1 3 7.2"></path></svg>
+      <span style="flex: 1; min-width: 0; font-size: 14px;"><span style="font-weight: 600;">Offline.</span> Showing the inbox from 14:12.</span>
+      <button type="button" style="flex: none; min-height: 44px; padding: 0 10px; border: 0; background: transparent; color: {{onInv}}; font: inherit; font-size: 14px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px;">Try again</button>
+    </div>
+    <div style="padding: 8px 16px 0; display: flex; flex-direction: column;">
+      <div style="border: 1px solid {{line}}; border-radius: 14px; background: {{surface}}; display: flex; align-items: center; gap: 10px; padding: 0 4px 0 14px;">
+        <span aria-hidden="true" style="flex: none; width: 8px; height: 8px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid {{ink3}};"></span>
+        <span style="flex: 1; min-height: 44px; display: flex; align-items: center; gap: 8px; white-space: nowrap;"><span style="font-weight: 600; color: {{ink2}};">Manager status paused</span></span>
+        <button type="button" disabled="disabled" style="flex: none; min-height: 44px; padding: 0 10px; border: 0; background: transparent; color: {{ink3}}; font: inherit; font-size: 14px; font-weight: 600;">Run tick now</button>
+      </div>
+      <h3 style="margin: 0; height: 26px; box-sizing: border-box; padding-bottom: 5px; display: flex; align-items: flex-end; gap: 6px; font-size: 13px; line-height: 16px; font-weight: 600; color: {{hiText}};">High <span style="font-weight: 500; color: {{ink3}};">2</span></h3>
+      <a href="Main.dc.html" style="display: grid; grid-template-columns: 16px 1fr 32px; column-gap: 8px; padding: 8px 0; border-top: 1px solid {{line}}; color: {{ink}}; text-decoration: none;">
+        <span aria-hidden="true" style="margin-top: 6px; width: 8px; height: 8px; border-radius: 50%; background: {{hi}};"></span>
+        <span style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+          <span style="font-weight: 500;">Can you renew the e2e-staging service token?</span>
+          <span style="display: flex; align-items: center; gap: 10px; white-space: nowrap; font-size: 13px; line-height: 18px; color: {{ink3}};"><span style="font-weight: 600; color: {{ink2}};">Blocker</span><span>O2</span><span style="font-weight: 600; color: {{accentText}};">You</span></span>
+        </span>
+        <span style="text-align: right; font-size: 13px; color: {{ink3}};">27m</span>
+      </a>
+    </div>
+  </section>
+
+  <h2 id="s-viewer" style="margin: 0; flex: none; height: 24px; box-sizing: border-box; padding: 0 16px; display: flex; align-items: center; background: {{sunk}}; border-top: 1px solid {{line}}; border-bottom: 1px solid {{line}}; font-size: 12px; line-height: 16px; font-weight: 600; color: {{ink2}};">Viewer, on a decision</h2>
+  <section aria-labelledby="s-viewer" style="flex: none; height: 202px; box-sizing: border-box; overflow: hidden; padding: 8px 16px 0; display: flex; flex-direction: column;">
+    <p style="margin: 0; display: flex; align-items: center; gap: 8px; font-size: 13px; line-height: 18px; color: {{ink2}};">
+      <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none;"><rect x="5" y="11" width="14" height="9" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg>
+      <span>Your role is viewer: you can read, not decide.</span>
+    </p>
+    <p style="margin: 6px 0 0; font-size: 17px; line-height: 22px; font-weight: 600; letter-spacing: -0.01em;">Keep D1 triggers, or write change rows in the Worker?</p>
+    <label style="margin-top: 8px; display: grid; grid-template-columns: 22px 1fr; column-gap: 12px; padding: 7px 14px 7px 12px; border: 1px solid {{line}}; border-radius: 14px; background: {{surface}};">
+      <input type="radio" name="viewer-call" value="a" disabled="disabled" style="margin: 1px 0 0; width: 20px; height: 20px;">
+      <span style="display: flex; flex-direction: column; gap: 2px; min-width: 0;">
+        <span style="font-weight: 600; color: {{ink2}};">Keep triggers, filter by actor</span>
+        <span style="font-size: 13px; line-height: 16px; font-weight: 600; color: {{accentText}};">Recommended, high confidence</span>
+      </span>
+    </label>
+    <div style="margin-top: 8px; display: grid; grid-template-columns: 52px 1fr 52px; gap: 8px; height: 44px; flex: none;">
+      <a href="Refined-Focus.dc.html" aria-label="Previous item" style="display: flex; align-items: center; justify-content: center; border: 1px solid {{lineStrong}}; border-radius: 14px; color: {{ink}};"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"></path></svg></a>
+      <button type="button" disabled="disabled" style="border: 0; border-radius: 14px; background: {{sunk}}; color: {{ink2}}; font: inherit; font-size: 15px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px;"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg>View only</button>
+      <a href="Refined-Focus.dc.html" aria-label="Next item" style="display: flex; align-items: center; justify-content: center; border: 1px solid {{lineStrong}}; border-radius: 14px; color: {{ink}};"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"></path></svg></a>
+    </div>
+  </section>
+
+  <h2 id="s-conflict" style="margin: 0; flex: none; height: 24px; box-sizing: border-box; padding: 0 16px; display: flex; align-items: center; background: {{sunk}}; border-top: 1px solid {{line}}; border-bottom: 1px solid {{line}}; font-size: 12px; line-height: 16px; font-weight: 600; color: {{ink2}};">Conflict on submit (409)</h2>
+  <section aria-labelledby="s-conflict" style="flex: none; height: 240px; box-sizing: border-box; overflow: hidden; padding: 8px 16px 0; display: flex; flex-direction: column;">
+    <div role="alert" style="display: flex; align-items: flex-start; gap: 10px; padding: 8px 12px; border: 1px solid {{warnLine}}; border-radius: 12px; background: {{warnSoft}}; color: {{warnText}}; font-size: 14px; line-height: 18px; font-weight: 600;">
+      <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none; margin-top: 1px;"><path d="M20 11a8 8 0 1 0-2.3 5.7"></path><path d="M20 5v6h-6"></path></svg>
+      <span>This item changed since you opened it — review and decide again.</span>
+    </div>
+    <label style="margin-top: 8px; display: grid; grid-template-columns: 22px 1fr auto; column-gap: 12px; align-items: center; min-height: 48px; box-sizing: border-box; padding: 0 14px 0 12px; border: 1px solid {{lineStrong}}; border-radius: 14px; background: {{surface}};">
+      <input type="radio" name="conflict-call" value="a" style="margin: 0; width: 20px; height: 20px; accent-color: {{accent}};">
+      <span style="font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Keep triggers, filter by actor</span>
+      <span style="font-size: 13px; line-height: 18px; font-weight: 600; color: {{warnText}};">Updated</span>
+    </label>
+    <label style="margin-top: 6px; display: flex; flex-direction: column; gap: 0; height: 52px; box-sizing: border-box; padding: 7px 12px; border: 1px solid {{lineStrong}}; border-radius: 12px; background: {{surface}};">
+      <span style="font-size: 12px; line-height: 16px; color: {{ink3}};">Your note for O3, kept</span>
+      <textarea rows="1" style="height: 20px; padding: 0; border: 0; resize: none; background: transparent; color: {{ink}}; font: inherit; font-size: 15px; line-height: 20px; overflow: hidden;">Ship it today; the backfill check can follow.</textarea>
+    </label>
+    <div style="margin-top: 8px; display: grid; grid-template-columns: 52px 1fr 52px; gap: 8px; height: 44px; flex: none;">
+      <a href="Refined-Focus.dc.html" aria-label="Previous item" style="display: flex; align-items: center; justify-content: center; border: 1px solid {{lineStrong}}; border-radius: 14px; color: {{ink}};"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"></path></svg></a>
+      <button type="button" disabled="disabled" style="border: 0; border-radius: 14px; background: {{sunk}}; color: {{ink2}}; font: inherit; font-size: 15px; font-weight: 600;">Choose an option</button>
+      <a href="Refined-Focus.dc.html" aria-label="Next item" style="display: flex; align-items: center; justify-content: center; border: 1px solid {{lineStrong}}; border-radius: 14px; color: {{ink}};"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"></path></svg></a>
+    </div>
+  </section>
+
+  <h2 id="s-clear" style="margin: 0; flex: none; height: 24px; box-sizing: border-box; padding: 0 16px; display: flex; align-items: center; background: {{sunk}}; border-top: 1px solid {{line}}; border-bottom: 1px solid {{line}}; font-size: 12px; line-height: 16px; font-weight: 600; color: {{ink2}};">Inbox clear, one item snoozed</h2>
+  <section aria-labelledby="s-clear" style="flex: 1; min-height: 0; box-sizing: border-box; overflow: hidden; padding: 18px 16px 0; display: flex; flex-direction: column;">
+    <p style="margin: 0; display: flex; align-items: center; gap: 10px; font-size: 22px; line-height: 28px; font-weight: 600; letter-spacing: -0.02em;">
+      <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="{{okText}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none;"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.5l2.8 2.8L16.5 9.5"></path></svg>Inbox clear
+    </p>
+    <p style="margin: 6px 0 0; color: {{ink2}};">Nothing needs you. One snoozed item wakes at 18:00 ET.</p>
+    <div style="margin-top: 12px; display: flex; gap: 8px;">
+      <button type="button" style="min-height: 44px; padding: 0 16px; border: 1px solid {{lineStrong}}; border-radius: 12px; background: {{surface}}; color: {{ink}}; font: inherit; font-size: 15px; font-weight: 600;">Show snoozed</button>
+      <a href="Refined-History.dc.html" style="min-height: 44px; padding: 0 12px; display: inline-flex; align-items: center; border-radius: 12px; color: {{accentText}}; text-decoration: none; font-size: 15px; font-weight: 600;">See what was decided</a>
+    </div>
+  </section>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const dark = this.props.dark === true || this.props.dark === 'true';
+    if (dark) {
+      return { bg: '#14171c', surface: '#1c2026', sunk: '#262b33', ink: '#eceef2', ink2: '#bcc3cc', ink3: '#9aa3ae', line: '#2c323b', lineStrong: '#48505b', accent: '#9db0ff', accentText: '#aebeff', hi: '#ff9b90', hiText: '#ffa89e', okText: '#7fdcaa', warnText: '#f2c879', warnSoft: '#352a14', warnLine: '#6b5426', inv: '#e6e9ed', onInv: '#14181d' };
+    }
+    return { bg: '#f4f5f7', surface: '#ffffff', sunk: '#e6e9ed', ink: '#14181d', ink2: '#424a54', ink3: '#5a636e', line: '#dde1e6', lineStrong: '#bcc3cc', accent: '#2d46c0', accentText: '#2d46c0', hi: '#c0271c', hiText: '#b0241a', okText: '#17693f', warnText: '#7a4a00', warnSoft: '#fbefd5', warnLine: '#e8c98a', inv: '#1d2229', onInv: '#f4f5f7' };
+  }
+}
+</script>
+</body>
+</html>

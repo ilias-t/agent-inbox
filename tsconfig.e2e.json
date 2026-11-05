@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"],
+    "allowJs": true,
+    "checkJs": false,
+    "tsBuildInfoFile": "node_modules/.tmp/e2e.tsbuildinfo"
+  },
+  "include": ["e2e", "playwright.config.ts"]
+}

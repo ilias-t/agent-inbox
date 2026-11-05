@@ -1,0 +1,64 @@
+// agent-inbox: one Cloudflare Worker that serves the built UI (dist/) and
+// answers the API from D1. Copy this file to wrangler.jsonc (gitignored); as
+// is, it runs locally. To deploy your own copy, replace the four <...> values
+// below (database_id, ACCESS_TEAM_DOMAIN, ACCESS_AUD, PUBLIC_URL). Everything
+// else can stay as is. A deploy repo generates the same file from these values
+// (scripts/wrangler-config.mjs), and tests use wrangler.test.jsonc, so a change
+// here goes into wrangler.test.jsonc too. Full steps: docs/deploy.md. Secrets (GITHUB_WEBHOOK_SECRET, NTFY_*, VAPID_*) are set
+// with `wrangler secret put`, never in this file.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // The Worker name; it is also the first label of the workers.dev host. If
+  // you change it, change PUBLIC_URL to match.
+  "name": "agent-inbox",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-09-01",
+  // enable_request_signal: request.signal aborts when the client disconnects,
+  // so abandoned /changes long-polls stop querying D1 (worker/routes/changes.ts).
+  "compatibility_flags": ["nodejs_compat", "enable_request_signal"],
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/agent/*", "/hooks/*"],
+  },
+  // Served at PUBLIC_URL below. Cloudflare Access guards the whole host (the
+  // allowed email(s) only) except /agent/* and /hooks/*, which a second Access
+  // app bypasses: those paths authenticate with bearer tokens and webhook
+  // signatures in the Worker itself (worker/auth.ts). Preview URLs would skip
+  // Access, so they stay off.
+  "workers_dev": true,
+  "preview_urls": false,
+  "d1_databases": [
+    {
+      "binding": "DB",
+      // Keep "agent-inbox": the npm db:migrate:* scripts use this name.
+      "database_name": "agent-inbox",
+      // Printed by `npx wrangler d1 create agent-inbox` (also in the
+      // dashboard: Storage & Databases → D1, or `npx wrangler d1 list`).
+      "database_id": "<your D1 database id>",
+      "migrations_dir": "migrations",
+    },
+  ],
+  "vars": {
+    // From the Access application that covers the whole host; until both are
+    // set, browser /api calls get 401.
+    // Team domain: the team name you picked when enabling Zero Trust, shown
+    // in the Zero Trust dashboard under Settings.
+    "ACCESS_TEAM_DOMAIN": "<team>.cloudflareaccess.com",
+    // Zero Trust dashboard → Access → Applications → your app → Overview →
+    // "Application Audience (AUD) Tag".
+    "ACCESS_AUD": "<Access application AUD tag>",
+    // Public base URL, used in ntfy notification links. After the first deploy
+    // wrangler prints it; your workers.dev subdomain is under Workers & Pages →
+    // Account details.
+    "PUBLIC_URL": "https://agent-inbox.<your-subdomain>.workers.dev",
+    // Deprecated: roles are set in Settings → People (docs/deploy.md). These
+    // humans (comma-separated) are admins while they have no saved role.
+    // "ADMIN_EMAILS": "you@example.com",
+  },
+  // Daily at 04:17 UTC: prune spent snoozes, and change log rows older than the retention window
+  // (worker/prune.ts; CHANGES_RETENTION_DAYS, default 30, min 7; REVIEWS_RETENTION_DAYS, default 90, min 14).
+  "triggers": { "crons": ["17 4 * * *"] },
+  "observability": { "enabled": true },
+}

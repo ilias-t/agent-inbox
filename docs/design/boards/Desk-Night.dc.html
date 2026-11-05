@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Desk · Night + shortcuts</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wdth,wght@0,75..100,400..700;1,75..100,400..700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#2d46c0}a:hover{color:#1f3399}
+input::placeholder{color:inherit;opacity:.72}
+</style>
+</helmet>
+<div style="width: 1280px; height: 800px; box-sizing: border-box; position: relative; overflow: hidden; background: {{bg}}; color: {{ink}}; font-family: 'Instrument Sans', sans-serif; font-size: 15px; line-height: 20px; font-variant-numeric: tabular-nums; display: flex; flex-direction: column;">
+
+  <header style="height: 52px; flex: none; box-sizing: border-box; padding: 0 16px 0 20px; display: flex; align-items: center; gap: 22px; border-bottom: 1px solid {{line}}; background: {{bg}};">
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <h1 style="margin: 0; font-size: 15px; line-height: 20px; font-weight: 600; letter-spacing: -0.01em;">Agent Inbox</h1>
+      <span style="height: 24px; padding: 0 9px; display: inline-flex; align-items: center; gap: 6px; border-radius: 12px; background: {{sunk}}; font-size: 13px; line-height: 16px; color: {{ink2}}; white-space: nowrap;"><span style="font-weight: 600; color: {{ink}};">5 need you</span><span aria-hidden="true">·</span>1 FYI</span>
+    </div>
+    <nav aria-label="Main" style="display: flex; align-items: stretch; align-self: stretch; gap: 4px;">
+      <a href="Desk-Split.dc.html" aria-current="page" aria-keyshortcuts="g i" style="display: flex; align-items: center; gap: 6px; padding: 0 10px; color: {{ink}}; text-decoration: none; font-size: 14px; font-weight: 600; box-shadow: inset 0 -2px 0 {{ink}};">Inbox <span style="color: {{hiText}};">5</span></a>
+      <button type="button" aria-keyshortcuts="g t" style="display: flex; align-items: center; gap: 6px; padding: 0 10px; border: 0; background: transparent; color: {{ink2}}; font: inherit; font-size: 14px; font-weight: 500;">Team <span style="color: {{ink3}};">4</span></button>
+      <button type="button" aria-keyshortcuts="g h" style="display: flex; align-items: center; gap: 6px; padding: 0 10px; border: 0; background: transparent; color: {{ink2}}; font: inherit; font-size: 14px; font-weight: 500;">History <span style="color: {{ink3}};">38</span></button>
+    </nav>
+    <label style="width: 260px; height: 36px; box-sizing: border-box; padding: 0 7px 0 10px; display: flex; align-items: center; gap: 8px; border-radius: 9px; background: {{sunk}}; color: {{ink2}};">
+      <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"></circle><path d="M16 16l4 4"></path></svg>
+      <span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;">Search history</span>
+      <input type="search" aria-keyshortcuts="/" placeholder="Search history" style="flex: 1; min-width: 0; height: 32px; padding: 0; border: 0; background: transparent; color: {{ink}}; font: inherit; font-size: 14px;">
+      <kbd aria-hidden="true" style="display: {{kbd}}; flex: none; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 5px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyBg}}; color: {{keyInk}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">/</kbd>
+    </label>
+    <div style="margin-left: auto; display: flex; align-items: center; gap: 8px;">
+      <a href="Desk-Split.dc.html" role="button" aria-label="Keyboard shortcuts" aria-haspopup="dialog" aria-expanded="true" aria-keyshortcuts="?" style="width: 36px; height: 36px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border-radius: 9px; background: {{accentSoft}}; box-shadow: 0 0 0 1px {{accent}}; color: {{accentText}}; text-decoration: none; font-size: 15px; font-weight: 600;">?</a>
+      <button type="button" aria-label="Settings" aria-keyshortcuts="g s" style="width: 36px; height: 36px; padding: 0; border: 0; border-radius: 9px; background: {{btn}}; box-shadow: {{elevBtn}}; color: {{ink2}}; display: flex; align-items: center; justify-content: center;">
+        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><circle cx="12" cy="12" r="6.5"></circle><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"></path></svg>
+      </button>
+    </div>
+  </header>
+
+  <div style="flex: 1; min-height: 0; display: grid; grid-template-columns: 440px minmax(0, 1fr);">
+
+    <section aria-label="Queue" style="position: relative; min-width: 0; min-height: 0; overflow: hidden; padding: 12px 0 0 20px; display: flex; flex-direction: column;">
+
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-right: 16px;">
+        <div role="group" aria-label="Show items" style="display: flex; height: 34px; padding: 3px; box-sizing: border-box; border-radius: 10px; background: {{sunk}};">
+          <button type="button" aria-pressed="true" style="padding: 0 10px; border: 0; border-radius: 7px; background: {{btn}}; box-shadow: {{elevSeg}}; color: {{ink}}; font: inherit; font-size: 13px; font-weight: 600;">All <span style="color: {{ink3}}; font-weight: 500;">6</span></button>
+          <button type="button" aria-pressed="false" style="padding: 0 10px; border: 0; border-radius: 7px; background: transparent; color: {{ink2}}; font: inherit; font-size: 13px; font-weight: 500;">Mine <span style="color: {{ink3}};">2</span></button>
+          <button type="button" aria-pressed="false" style="padding: 0 10px; border: 0; border-radius: 7px; background: transparent; color: {{ink2}}; font: inherit; font-size: 13px; font-weight: 500;">Unassigned <span style="color: {{ink3}};">4</span></button>
+        </div>
+      </div>
+
+      <section aria-label="Manager" style="margin: 10px 16px 2px 0; border-radius: 12px; background: {{card}}; box-shadow: {{elev}};">
+        <div style="height: 38px; display: flex; align-items: center; gap: 10px; padding: 0 4px 0 14px;">
+          <span aria-hidden="true" style="flex: none; width: 8px; height: 8px; border-radius: 50%; background: {{ok}}; box-shadow: {{glowOk}};"></span>
+          <button type="button" aria-expanded="false" aria-label="Manager status: next pickup 14:23, last tick 7 minutes ago. Show schedule" style="flex: 1; min-width: 0; height: 34px; padding: 0; border: 0; background: transparent; color: {{ink}}; font: inherit; font-size: 14px; text-align: left; display: flex; align-items: baseline; gap: 8px; white-space: nowrap; overflow: hidden;">
+            <span style="color: {{ink2}};">Next pickup</span>
+            <span style="font-weight: 600; text-shadow: {{glowInk}};">14:23</span>
+            <span style="font-size: 13px; color: {{ink3}};">last tick 7m ago</span>
+          </button>
+          <button type="button" style="flex: none; height: 30px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: {{accentText}}; font: inherit; font-size: 13px; font-weight: 600;">Run tick now</button>
+        </div>
+        <button type="button" aria-expanded="false" style="width: 100%; height: 38px; padding: 0 10px 0 14px; border: 0; border-top: 1px solid {{line}}; border-radius: 0 0 12px 12px; background: transparent; color: {{ink2}}; font: inherit; font-size: 14px; text-align: left; display: flex; align-items: center; gap: 10px;">
+          <span style="flex: none; font-weight: 600; color: {{ink}};">Digest</span>
+          <span style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">O3 waits on the change-log decision; O2 is blocked on the staging token; O1 PR #12 is ready.</span>
+          <span style="flex: none; display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: {{accentText}};"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 50%; background: {{accent}}; box-shadow: {{glow}};"></span>New</span>
+          <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none; color: {{ink3}};"><path d="M6 9l6 6 6-6"></path></svg>
+        </button>
+      </section>
+
+      <section aria-labelledby="g-high" style="display: flex; flex-direction: column;">
+        <h2 id="g-high" style="margin: 0; height: 26px; box-sizing: border-box; padding-bottom: 5px; display: flex; align-items: flex-end; gap: 6px; font-size: 13px; line-height: 16px; font-weight: 600; color: {{hiText}};">High <span style="font-weight: 500; color: {{ink3}};">2</span></h2>
+        <a href="Desk-Split.dc.html" aria-current="true" style="position: relative; z-index: 1; display: grid; grid-template-columns: 14px 1fr auto; column-gap: 10px; margin: 0 -1px 0 -10px; padding: 7px 17px 7px 9px; border: 1px solid {{line}}; border-right: 0; border-radius: 10px 0 0 10px; background: {{pane}}; color: {{ink}}; text-decoration: none;">
+          <span aria-hidden="true" style="position: absolute; left: -8px; top: 50%; margin-top: -11px; width: 3px; height: 22px; border-radius: 2px; background: {{accent}}; box-shadow: {{glow}};"></span>
+          <span aria-hidden="true" style="margin-top: 6px; width: 8px; height: 8px; border-radius: 50%; background: {{hi}}; box-shadow: {{glowHi}};"></span>
+          <span style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+            <span style="font-weight: 600;">Keep D1 triggers, or write change rows in the Worker?</span>
+            <span style="display: flex; align-items: center; gap: 10px; white-space: nowrap; overflow: hidden; font-size: 13px; line-height: 18px; color: {{ink3}};"><span style="font-weight: 600; color: {{ink2}};">Decision</span><span>O3</span><span style="color: {{accentText}}; font-weight: 600;">You</span><span style="display: inline-flex; align-items: center; gap: 5px; color: {{accentText}}; font-weight: 600;"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 50%; background: {{accent}}; box-shadow: {{glow}};"></span>Answered</span><span>High confidence</span></span>
+          </span>
+          <span style="font-size: 13px; color: {{ink3}};">31m</span>
+        </a>
+        <a href="Desk-Split.dc.html" style="display: grid; grid-template-columns: 14px 1fr auto; column-gap: 10px; padding: 7px 16px 7px 0; border-top: 1px solid {{line}}; color: {{ink}}; text-decoration: none;">
+          <span aria-hidden="true" style="margin-top: 6px; width: 8px; height: 8px; border-radius: 50%; background: {{hi}}; box-shadow: {{glowHi}};"></span>
+          <span style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+            <span style="font-weight: 500;">Can you renew the e2e-staging service token?</span>
+            <span style="display: flex; gap: 10px; white-space: nowrap; font-size: 13px; line-height: 18px; color: {{ink3}};"><span style="font-weight: 600; color: {{ink2}};">Blocker</span><span>O2</span><span style="color: {{accentText}}; font-weight: 600;">You</span></span>
+          </span>
+          <span style="font-size: 13px; color: {{ink3}};">27m</span>
+        </a>
+      </section>
+
+      <section aria-labelledby="g-normal" style="display: flex; flex-direction: column;">
+        <h2 id="g-normal" style="margin: 0; height: 26px; box-sizing: border-box; padding-bottom: 5px; display: flex; align-items: flex-end; gap: 6px; font-size: 13px; line-height: 16px; font-weight: 600; color: {{ink2}};">Normal <span style="font-weight: 500; color: {{ink3}};">2</span></h2>
+        <a href="Desk-Split.dc.html" style="display: grid; grid-template-columns: 14px 1fr auto; column-gap: 10px; padding: 7px 16px 7px 0; border-top: 1px solid {{line}}; color: {{ink}}; text-decoration: none;">
+          <span aria-hidden="true" style="margin-top: 6px; width: 8px; height: 8px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid {{ink3}};"></span>
+          <span style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+            <span style="font-weight: 500;">Start an orchestrator on the end-of-day digest?</span>
+            <span style="display: flex; gap: 10px; white-space: nowrap; font-size: 13px; line-height: 18px; color: {{ink3}};"><span style="font-weight: 600; color: {{ink2}};">Proposal</span><span>Manager</span><span>Size S</span><span>From Linear</span></span>
+          </span>
+          <span style="font-size: 13px; color: {{ink3}};">2h</span>
+        </a>
+        <a href="Desk-Split.dc.html" style="display: grid; grid-template-columns: 14px 1fr auto; column-gap: 10px; padding: 7px 16px 7px 0; border-top: 1px solid {{line}}; color: {{ink}}; text-decoration: none;">
+          <span aria-hidden="true" style="margin-top: 6px; width: 8px; height: 8px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid {{ink3}};"></span>
+          <span style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+            <span style="font-weight: 500;">PR #12: dedupe webhook deliveries</span>
+            <span style="display: flex; align-items: center; gap: 10px; white-space: nowrap; font-size: 13px; line-height: 18px; color: {{ink3}};"><span style="font-weight: 600; color: {{ink2}};">PR ready</span><span>O1</span><span style="display: inline-flex; align-items: center; gap: 4px; color: {{okText}}; font-weight: 600;"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>CI green</span><span>+84 −12</span></span>
+          </span>
+          <span style="font-size: 13px; color: {{ink3}};">8m</span>
+        </a>
+      </section>
+
+      <section aria-labelledby="g-low" style="display: flex; flex-direction: column;">
+        <h2 id="g-low" style="margin: 0; height: 26px; box-sizing: border-box; padding-bottom: 5px; display: flex; align-items: flex-end; gap: 6px; font-size: 13px; line-height: 16px; font-weight: 600; color: {{ink2}};">Low <span style="font-weight: 500; color: {{ink3}};">1</span></h2>
+        <a href="Desk-Split.dc.html" style="display: grid; grid-template-columns: 14px 1fr auto; column-gap: 10px; padding: 7px 16px 7px 0; border-top: 1px solid {{line}}; color: {{ink}}; text-decoration: none;">
+          <span aria-hidden="true" style="margin-top: 9px; width: 8px; height: 2px; border-radius: 1px; background: {{ink3}};"></span>
+          <span style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+            <span style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">D1 usage this week: 0.4% of the free read quota</span>
+            <span style="display: flex; gap: 10px; white-space: nowrap; font-size: 13px; line-height: 18px; color: {{ink3}};"><span style="font-weight: 600; color: {{ink2}};">Info</span><span>Manager</span></span>
+          </span>
+          <span style="font-size: 13px; color: {{ink3}};">5h</span>
+        </a>
+      </section>
+
+      <section aria-labelledby="g-fyi" style="display: flex; flex-direction: column;">
+        <h2 id="g-fyi" style="margin: 0; height: 26px; box-sizing: border-box; padding-bottom: 5px; display: flex; align-items: flex-end; gap: 6px; font-size: 13px; line-height: 16px; font-weight: 600; color: {{ink2}};">FYI · decided for you <span style="font-weight: 500; color: {{ink3}};">1</span></h2>
+        <div style="display: grid; grid-template-columns: 14px 1fr; column-gap: 10px; padding: 7px 16px 6px 0; border-top: 1px solid {{line}};">
+          <span aria-hidden="true" style="margin-top: 6px; width: 8px; height: 8px; box-sizing: border-box; border-radius: 2px; border: 1.5px solid {{ink3}};"></span>
+          <div style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+            <a href="Desk-Split.dc.html" style="display: flex; justify-content: space-between; gap: 10px; color: {{ink}}; text-decoration: none; font-weight: 500;"><span>Raised the e2e retry budget from 1 to 2 while the flake fix lands</span><span style="flex: none; font-size: 13px; font-weight: 400; color: {{ink3}};">3h</span></a>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="flex: 1; display: flex; gap: 10px; white-space: nowrap; font-size: 13px; line-height: 18px; color: {{ink3}};"><span style="font-weight: 600; color: {{ink2}};">O5 chose</span><span>Retry twice</span></span>
+              <button type="button" aria-keyshortcuts="y" style="height: 32px; padding: 0 12px; border: 0; border-radius: 8px; background: {{btn}}; box-shadow: {{elevBtn}}; color: {{ink}}; font: inherit; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>Looks good</button>
+              <button type="button" aria-keyshortcuts="o" style="height: 32px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: {{ink2}}; font: inherit; font-size: 13px; font-weight: 600;">Override…</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section aria-labelledby="g-snoozed" style="display: flex; flex-direction: column;">
+        <h2 id="g-snoozed" style="margin: 0;">
+          <button type="button" aria-expanded="true" style="width: 100%; height: 34px; padding: 0 16px 5px 0; border: 0; background: transparent; color: {{ink2}}; font: inherit; font-size: 13px; line-height: 16px; font-weight: 600; display: flex; align-items: flex-end; gap: 6px; text-align: left;">Snoozed <span style="font-weight: 500; color: {{ink3}};">1</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: auto; color: {{ink3}};"><path d="M6 15l6-6 6 6"></path></svg></button>
+        </h2>
+        <div style="display: grid; grid-template-columns: 14px 1fr auto; column-gap: 10px; align-items: center; padding: 4px 16px 4px 0; border-top: 1px solid {{line}};">
+          <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: {{ink3}};"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5V12l3 2"></path></svg>
+          <a href="Desk-Split.dc.html" style="display: flex; flex-direction: column; gap: 1px; min-width: 0; color: {{ink2}}; text-decoration: none;">
+            <span style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Upgrade wrangler to v4?</span>
+            <span style="font-size: 13px; line-height: 18px; color: {{ink3}};">until today 18:00 ET</span>
+          </a>
+          <button type="button" style="height: 32px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: {{accentText}}; font: inherit; font-size: 13px; font-weight: 600;">Unsnooze</button>
+        </div>
+      </section>
+    </section>
+
+    <section aria-label="Selected item" style="position: relative; min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; border-left: 1px solid {{line}}; background: {{pane}};">
+
+      <div style="height: 48px; flex: none; box-sizing: border-box; padding: 0 32px; display: flex; align-items: center; gap: 14px; border-bottom: 1px solid {{line}};">
+        <span style="font-size: 13px; line-height: 16px; font-weight: 500; color: {{ink3}};"><span style="font-weight: 600; color: {{accentText}}; text-shadow: {{glow}};">1</span> of <span style="font-weight: 600; color: {{ink2}};">5</span></span>
+        <span aria-hidden="true" style="display: flex; gap: 3px;">
+          <span style="width: 36px; height: 3px; border-radius: 2px; background: {{accent}}; box-shadow: {{glow}};"></span>
+          <span style="width: 36px; height: 3px; border-radius: 2px; background: {{track}};"></span>
+          <span style="width: 36px; height: 3px; border-radius: 2px; background: {{track}};"></span>
+          <span style="width: 36px; height: 3px; border-radius: 2px; background: {{track}};"></span>
+          <span style="width: 36px; height: 3px; border-radius: 2px; background: {{track}};"></span>
+        </span>
+        <div style="margin-left: auto; display: flex; align-items: center; gap: 6px;">
+          <button type="button" disabled="disabled" aria-label="Previous: this is the first item" aria-keyshortcuts="k ArrowLeft" style="border: 0; font: inherit; height: 34px; box-sizing: border-box; padding: 0 8px 0 6px; display: flex; align-items: center; gap: 6px; border-radius: 8px; background: {{btn}}; box-shadow: {{elevBtn}}; color: {{ink3}}; opacity: 0.55;">
+            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"></path></svg>
+            <kbd aria-hidden="true" style="display: {{kbd}}; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 5px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyBg}}; color: {{keyInk}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">k</kbd>
+          </button>
+          <a href="Desk-Split.dc.html" aria-label="Next: renew the e2e-staging token" aria-keyshortcuts="j ArrowRight" style="height: 34px; box-sizing: border-box; padding: 0 6px 0 8px; display: flex; align-items: center; gap: 6px; border-radius: 8px; background: {{btn}}; box-shadow: {{elevBtn}}; color: {{ink}}; text-decoration: none;">
+            <kbd aria-hidden="true" style="display: {{kbd}}; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 5px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyBg}}; color: {{keyInk}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">j</kbd>
+            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"></path></svg>
+          </a>
+        </div>
+      </div>
+
+      <div style="flex: 1; min-height: 0; overflow: hidden; box-sizing: border-box; padding: 16px 32px 0; display: grid; grid-template-columns: minmax(0, 1fr) 272px; column-gap: 36px; align-items: start;">
+
+        <div style="display: flex; flex-direction: column; min-width: 0;">
+          <section aria-labelledby="ctx-o3" style="padding: 9px 12px 10px 14px; border-radius: 12px; background: {{sunk}}; display: flex; flex-direction: column; gap: 4px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 22px;">
+              <h3 id="ctx-o3" style="margin: 0; font-size: 13px; line-height: 16px; font-weight: 600; color: {{ink2}};">O3 · change log</h3>
+              <a href="#o3-briefing" style="display: inline-flex; align-items: center; gap: 2px; font-size: 13px; line-height: 18px; font-weight: 600; color: {{accentText}}; text-decoration: none;">Open O3 briefing<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"></path></svg></a>
+            </div>
+            <dl style="margin: 0; display: grid; grid-template-columns: 40px 1fr; gap: 2px 10px; font-size: 14px; line-height: 20px;">
+              <dt style="color: {{ink3}};">Why</dt><dd style="margin: 0; color: {{ink}};">Hear about human edits without polling.</dd>
+              <dt style="color: {{ink3}};">Goal</dt><dd style="margin: 0; color: {{ink}};">Only human edits wake the manager.</dd>
+            </dl>
+          </section>
+
+          <div style="margin-top: 12px; display: flex; align-items: center; gap: 14px; font-size: 13px; line-height: 18px; color: {{ink3}};">
+            <span style="display: inline-flex; align-items: center; gap: 6px; color: {{hiText}}; font-weight: 600;"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%; background: {{hi}}; box-shadow: {{glowHi}};"></span>High</span>
+            <span>Decision</span>
+            <span>from O3</span>
+            <span style="color: {{accentText}}; font-weight: 600;">You</span>
+            <span>31m</span>
+          </div>
+          <h2 tabindex="-1" style="margin: 8px 0 0; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.016em;">Keep D1 triggers, or write change rows in the Worker?</h2>
+          <p style="margin: 8px 0 0; font-size: 15px; line-height: 22px; color: {{ink2}};">Importing 400 docs logged 400 changes and woke the manager 400 times.</p>
+          <p style="margin: 8px 0 0; display: flex; align-items: center; gap: 8px; font-size: 14px; line-height: 20px; color: {{ink2}};">
+            <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none; color: {{ink3}};"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5V12l3 2"></path></svg>
+            <span><span style="color: {{ink3}};">Cost of waiting</span> O3 is idle until this is decided.</span>
+          </p>
+
+          <fieldset style="margin: 14px 0 0; padding: 0; border: 0; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+            <legend style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;">Your call</legend>
+            <label style="display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; column-gap: 12px; padding: 12px 14px 12px 12px; border-radius: 12px; background: {{cardSel}}; box-shadow: {{selRing}};">
+              <input type="radio" name="call" value="a" checked="checked" aria-keyshortcuts="1" style="margin: 1px 0 0; width: 18px; height: 18px; accent-color: {{accent}};">
+              <span style="display: flex; flex-direction: column; gap: 4px; min-width: 0;">
+                <span style="font-size: 17px; line-height: 22px; font-weight: 600;">Keep triggers, filter by actor</span>
+                <span style="display: flex; align-items: center; gap: 14px; font-size: 13px; line-height: 18px;"><span style="font-weight: 600; color: {{accentText}};">Recommended, high confidence</span><span style="display: inline-flex; align-items: center; gap: 4px; color: {{ink3}};"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h11a4 4 0 0 1 0 8H9"></path><path d="M7 6L4 9l3 3"></path></svg>Reversible</span></span>
+                <span style="font-size: 14px; line-height: 20px; color: {{ink2}};">Triggers keep the log complete by construction.</span>
+                <span style="font-size: 14px; line-height: 20px; color: {{ink2}};"><span style="color: {{ink3}};">Then</span> O3 adds a test that <span style="font-weight: 600; color: {{ink}};">wait --human</span> ignores import rows.</span>
+              </span>
+              <kbd aria-hidden="true" style="display: {{kbd}}; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 5px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyBg}}; color: {{keyInk}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">1</kbd>
+            </label>
+            <label style="display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; column-gap: 12px; padding: 12px 14px 12px 12px; border-radius: 12px; background: {{card}}; box-shadow: {{elevBtn}};">
+              <input type="radio" name="call" value="b" aria-keyshortcuts="2" style="margin: 1px 0 0; width: 18px; height: 18px; accent-color: {{accent}};">
+              <span style="display: flex; flex-direction: column; gap: 4px; min-width: 0;">
+                <span style="display: flex; align-items: baseline; gap: 14px;"><span style="font-size: 17px; line-height: 22px; font-weight: 600;">Write rows in the Worker</span><span style="flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: 13px; line-height: 18px; color: {{ink3}};"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15M14 7l5 5-5 5"></path></svg>One-way</span></span>
+                <span style="font-size: 14px; line-height: 20px; color: {{ink2}};"><span style="font-weight: 600; color: {{ink}};">Tradeoff</span> Every write path must remember to log.</span>
+              </span>
+              <kbd aria-hidden="true" style="display: {{kbd}}; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 5px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyBg}}; color: {{keyInk}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">2</kbd>
+            </label>
+            <label style="display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; column-gap: 12px; padding: 12px 14px 12px 12px; border-radius: 12px; background: {{card}}; box-shadow: {{elevBtn}};">
+              <input type="radio" name="call" value="other" aria-keyshortcuts="3" style="margin: 1px 0 0; width: 18px; height: 18px; accent-color: {{accent}};">
+              <span style="display: flex; flex-direction: column; gap: 2px; min-width: 0;">
+                <span style="font-size: 17px; line-height: 22px; font-weight: 600;">Other…</span>
+                <span style="font-size: 14px; line-height: 20px; color: {{ink3}};">Tell O3 what to do instead. Needs a note.</span>
+              </span>
+              <kbd aria-hidden="true" style="display: {{kbd}}; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 5px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyBg}}; color: {{keyInk}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">3</kbd>
+            </label>
+          </fieldset>
+        </div>
+
+        <aside aria-label="About this decision" style="display: flex; flex-direction: column; min-width: 0;">
+          <section aria-labelledby="r-q" style="padding: 0 0 12px; display: flex; flex-direction: column; gap: 8px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 32px;">
+              <h3 id="r-q" style="margin: 0; font-size: 13px; line-height: 16px; font-weight: 600; color: {{ink2}};">Questions <span style="font-weight: 500; color: {{ink3}};">2</span></h3>
+              <button type="button" aria-keyshortcuts="a" style="height: 32px; padding: 0 4px 0 10px; border: 0; border-radius: 8px; background: transparent; color: {{accentText}}; font: inherit; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px;">Ask a question<kbd aria-hidden="true" style="display: {{kbd}}; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 5px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyBg}}; color: {{keyInk}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">a</kbd></button>
+            </div>
+            <div style="align-self: flex-end; max-width: 236px; display: flex; flex-direction: column; align-items: flex-end; gap: 3px;">
+              <span style="font-size: 12px; line-height: 16px; color: {{ink3}};"><span style="font-weight: 600; color: {{ink2}};">You</span> 14:02</span>
+              <p style="margin: 0; padding: 7px 10px; border-radius: 10px 10px 3px 10px; background: {{sunk}}; font-size: 14px; line-height: 20px; color: {{ink}};">Does the filter also skip the nightly backfill?</p>
+            </div>
+            <div style="align-self: flex-start; max-width: 252px; display: flex; flex-direction: column; align-items: flex-start; gap: 3px;">
+              <span style="display: flex; align-items: center; gap: 6px; font-size: 12px; line-height: 16px; color: {{ink3}};"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 50%; background: {{accent}}; box-shadow: {{glow}};"></span><span style="font-weight: 600; color: {{accentText}};">O3 answered</span> 4m ago</span>
+              <p style="margin: 0; padding: 7px 10px; border-radius: 10px 10px 10px 3px; background: {{card}}; box-shadow: {{elevBtn}}; font-size: 14px; line-height: 20px; color: {{ink}};">Yes. The backfill writes as actor <span style="font-weight: 600;">import</span>, so the same filter skips it.</p>
+            </div>
+          </section>
+
+          <section aria-labelledby="r-sn" style="padding: 10px 0 12px; border-top: 1px solid {{line}}; display: flex; flex-direction: column; gap: 8px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 22px;">
+              <h3 id="r-sn" style="margin: 0; display: flex; align-items: center; gap: 8px; font-size: 13px; line-height: 16px; font-weight: 600; color: {{ink2}};">Snooze<kbd aria-hidden="true" style="display: {{kbd}}; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 5px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyBg}}; color: {{keyInk}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">s</kbd></h3>
+              <span style="font-size: 12px; line-height: 16px; color: {{ink3}};">Wakes in ET</span>
+            </div>
+            <div role="group" aria-labelledby="r-sn" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px;">
+              <button type="button" style="height: 44px; padding: 0 10px; border: 0; border-radius: 9px; background: {{btn}}; box-shadow: {{elevBtn}}; color: {{ink}}; font: inherit; text-align: left; display: flex; flex-direction: column; justify-content: center; gap: 1px;"><span style="font-size: 13px; line-height: 16px; font-weight: 600;">1 hour</span><span style="font-size: 12px; line-height: 16px; color: {{ink3}};">15:16</span></button>
+              <button type="button" style="height: 44px; padding: 0 10px; border: 0; border-radius: 9px; background: {{btn}}; box-shadow: {{elevBtn}}; color: {{ink}}; font: inherit; text-align: left; display: flex; flex-direction: column; justify-content: center; gap: 1px;"><span style="font-size: 13px; line-height: 16px; font-weight: 600;">Tonight 6 pm</span><span style="font-size: 12px; line-height: 16px; color: {{ink3}};">Today 18:00</span></button>
+              <button type="button" style="height: 44px; padding: 0 10px; border: 0; border-radius: 9px; background: {{btn}}; box-shadow: {{elevBtn}}; color: {{ink}}; font: inherit; text-align: left; display: flex; flex-direction: column; justify-content: center; gap: 1px;"><span style="font-size: 13px; line-height: 16px; font-weight: 600;">Tomorrow 9 am</span><span style="font-size: 12px; line-height: 16px; color: {{ink3}};">Fri 09:00</span></button>
+              <button type="button" style="height: 44px; padding: 0 10px; border: 0; border-radius: 9px; background: {{btn}}; box-shadow: {{elevBtn}}; color: {{ink}}; font: inherit; text-align: left; display: flex; flex-direction: column; justify-content: center; gap: 1px;"><span style="font-size: 13px; line-height: 16px; font-weight: 600;">Monday 9 am</span><span style="font-size: 12px; line-height: 16px; color: {{ink3}};">Oct 12 09:00</span></button>
+            </div>
+          </section>
+
+          <section aria-labelledby="r-as" style="padding: 10px 0 12px; border-top: 1px solid {{line}}; display: flex; flex-direction: column; gap: 6px;">
+            <h3 id="r-as" style="margin: 0; min-height: 22px; display: flex; align-items: center; font-size: 13px; line-height: 16px; font-weight: 600; color: {{ink2}};">Assigned to</h3>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span aria-hidden="true" style="flex: none; width: 28px; height: 28px; border-radius: 50%; background: {{accentSoft}}; color: {{accentText}}; display: flex; align-items: center; justify-content: center;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8.5" r="3.5"></circle><path d="M5 20c1-3.6 3.8-5.5 7-5.5s6 1.9 7 5.5"></path></svg></span>
+              <span style="flex: 1; min-width: 0; font-size: 14px; line-height: 18px; font-weight: 600; color: {{accentText}};">You</span>
+              <button type="button" style="height: 32px; padding: 0 8px; border: 0; border-radius: 8px; background: transparent; color: {{ink2}}; font: inherit; font-size: 13px; font-weight: 600;">Unassign</button>
+              <button type="button" style="height: 32px; padding: 0 10px; border: 0; border-radius: 8px; background: {{btn}}; box-shadow: {{elevBtn}}; color: {{ink}}; font: inherit; font-size: 13px; font-weight: 600;">Someone else…</button>
+            </div>
+          </section>
+
+          <section aria-labelledby="r-ev" style="padding: 10px 0 0; border-top: 1px solid {{line}}; display: flex; flex-direction: column;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 22px;">
+              <h3 id="r-ev" style="margin: 0; font-size: 13px; line-height: 16px; font-weight: 600; color: {{ink2}};">Evidence</h3>
+              <a href="#o3-chat" style="font-size: 13px; line-height: 18px; font-weight: 600; color: {{accentText}}; text-decoration: none;">Open O3 chat</a>
+            </div>
+            <a href="#import-run-log" style="min-height: 32px; display: flex; align-items: center; gap: 10px; color: {{ink}}; text-decoration: none; font-size: 14px;">
+              <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none; color: {{ink3}};"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"></path><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"></path></svg>
+              <span>Import run: 400 change rows logged</span>
+            </a>
+            <a href="#migration-0003" style="min-height: 32px; display: flex; align-items: center; gap: 10px; color: {{ink}}; text-decoration: none; font-size: 14px;">
+              <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none; color: {{ink3}};"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"></path><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"></path></svg>
+              <span>Migration 0003: change-log triggers</span>
+            </a>
+          </section>
+        </aside>
+      </div>
+
+      <div style="height: 76px; flex: none; box-sizing: border-box; padding: 9px 32px 7px; display: flex; align-items: flex-start; gap: 12px; border-top: 1px solid {{line}}; background: {{pane}};">
+        <label style="flex: 1; min-width: 0; height: 40px; box-sizing: border-box; padding: 0 8px 0 12px; display: flex; align-items: center; gap: 4px; border-radius: 10px; background: {{field}}; box-shadow: {{fieldEdge}}; color: {{ink2}};">
+          <span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;">Note for O3, optional</span>
+          <input type="text" maxlength="1500" placeholder="Add a note for O3 (optional)" style="flex: 1; min-width: 0; height: 36px; padding: 0; border: 0; background: transparent; color: {{ink}}; font: inherit; font-size: 14px;">
+          <kbd aria-hidden="true" style="display: {{kbd}}; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 5px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyBg}}; color: {{keyInk}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">⌘</kbd>
+          <kbd aria-hidden="true" style="display: {{kbd}}; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 5px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyBg}}; color: {{keyInk}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">↵</kbd>
+        </label>
+        <div style="width: 240px; flex: none; display: flex; flex-direction: column; gap: 4px;">
+          <button type="button" aria-keyshortcuts="Enter" aria-describedby="desk-next" style="width: 100%; height: 40px; display: flex; align-items: center; justify-content: center; gap: 10px; border: 0; border-radius: 10px; background: {{accent}}; box-shadow: {{ctaGlow}}; color: {{onAccent}}; font: inherit; font-size: 15px; font-weight: 600;">Submit: Keep triggers<kbd aria-hidden="true" style="display: {{kbd}}; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 5px; box-sizing: border-box; border: 1px solid {{keyAccLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyAccBg}}; color: {{onAccent}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">↵</kbd></button>
+          <span id="desk-next" style="font-size: 12px; line-height: 16px; color: {{ink3}}; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Next: Can you renew the e2e-staging service token?</span>
+        </div>
+      </div>
+
+      <div style="height: 34px; flex: none; box-sizing: border-box; padding: 0 32px; display: {{kbdFlex}}; align-items: center; gap: 16px; border-top: 1px solid {{line}}; background: {{bg}}; font-size: 12px; line-height: 16px; color: {{ink2}}; white-space: nowrap;">
+        <span style="display: inline-flex; align-items: center; gap: 3px;"><kbd aria-hidden="true" style="display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 4px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 4px; background: {{keyBg}}; color: {{keyInk}}; font-family: inherit; font-size: 11px; line-height: 1; font-weight: 600; font-stretch: 90%;">j</kbd><kbd aria-hidden="true" style="display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 4px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 4px; background: {{keyBg}}; color: {{keyInk}}; font-family: inherit; font-size: 11px; line-height: 1; font-weight: 600; font-stretch: 90%;">→</kbd><span style="margin-left: 3px;">Next</span></span>
+        <span style="display: inline-flex; align-items: center; gap: 3px;"><kbd aria-hidden="true" style="display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 4px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 4px; background: {{keyBg}}; color: {{keyInk}}; font-family: inherit; font-size: 11px; line-height: 1; font-weight: 600; font-stretch: 90%;">k</kbd><kbd aria-hidden="true" style="display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 4px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 4px; background: {{keyBg}}; color: {{keyInk}}; font-family: inherit; font-size: 11px; line-height: 1; font-weight: 600; font-stretch: 90%;">←</kbd><span style="margin-left: 3px;">Previous</span></span>
+        <span style="display: inline-flex; align-items: center; gap: 3px;"><kbd aria-hidden="true" style="display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 4px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 4px; background: {{keyBg}}; color: {{keyInk}}; font-family: inherit; font-size: 11px; line-height: 1; font-weight: 600; font-stretch: 90%;">1–3</kbd><span style="margin-left: 3px;">Choose</span></span>
+        <span style="display: inline-flex; align-items: center; gap: 3px;"><kbd aria-hidden="true" style="display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 4px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 4px; background: {{keyBg}}; color: {{keyInk}}; font-family: inherit; font-size: 11px; line-height: 1; font-weight: 600; font-stretch: 90%;">↵</kbd><span style="margin-left: 3px;">Submit</span></span>
+        <span style="display: inline-flex; align-items: center; gap: 3px;"><kbd aria-hidden="true" style="display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 4px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 4px; background: {{keyBg}}; color: {{keyInk}}; font-family: inherit; font-size: 11px; line-height: 1; font-weight: 600; font-stretch: 90%;">a</kbd><span style="margin-left: 3px;">Ask</span></span>
+        <span style="display: inline-flex; align-items: center; gap: 3px;"><kbd aria-hidden="true" style="display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 4px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 4px; background: {{keyBg}}; color: {{keyInk}}; font-family: inherit; font-size: 11px; line-height: 1; font-weight: 600; font-stretch: 90%;">s</kbd><span style="margin-left: 3px;">Snooze</span></span>
+        <span style="display: inline-flex; align-items: center; gap: 3px;"><kbd aria-hidden="true" style="display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 4px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 4px; background: {{keyBg}}; color: {{keyInk}}; font-family: inherit; font-size: 11px; line-height: 1; font-weight: 600; font-stretch: 90%;">u</kbd><kbd aria-hidden="true" style="display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 4px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 4px; background: {{keyBg}}; color: {{keyInk}}; font-family: inherit; font-size: 11px; line-height: 1; font-weight: 600; font-stretch: 90%;">Esc</kbd><span style="margin-left: 3px;">Back</span></span>
+        <a href="Desk-Split.dc.html" style="margin-left: auto; min-height: 32px; display: inline-flex; align-items: center; gap: 6px; color: {{ink2}}; text-decoration: none; font-weight: 600;"><kbd aria-hidden="true" style="display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 4px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 4px; background: {{keyBg}}; color: {{keyInk}}; font-family: inherit; font-size: 11px; line-height: 1; font-weight: 600; font-stretch: 90%;">?</kbd>All keys</a>
+      </div>
+    </section>
+  </div>
+
+  <div aria-hidden="true" style="position: absolute; inset: 0; z-index: 10; background: {{scrim}};"></div>
+  <section role="dialog" aria-modal="true" aria-labelledby="keys-title" style="position: absolute; left: 220px; top: 150px; z-index: 11; width: 840px; box-sizing: border-box; padding: 18px 22px 18px; border-radius: 16px; background: {{sheet}}; box-shadow: {{shadow}}; display: flex; flex-direction: column; gap: 14px; font-size: 14px; line-height: 18px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; min-height: 36px;">
+      <h2 id="keys-title" style="margin: 0; font-size: 18px; line-height: 24px; font-weight: 600; letter-spacing: -0.01em;">Keyboard shortcuts</h2>
+      <a href="Desk-Split.dc.html" aria-label="Close keyboard shortcuts" style="height: 36px; padding: 0 6px 0 12px; display: flex; align-items: center; gap: 8px; border-radius: 9px; background: {{btn}}; box-shadow: {{elevBtn}}; color: {{ink}}; text-decoration: none; font-size: 14px; font-weight: 600;">Close<kbd aria-hidden="true" style="display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyBg}}; color: {{ink}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">?</kbd></a>
+    </div>
+    <div style="display: grid; grid-template-columns: 330px minmax(0, 1fr) minmax(0, 1fr); column-gap: 28px; align-items: start;">
+          <section aria-labelledby="k-item" style="display: flex; flex-direction: column; gap: 6px; min-width: 0;">
+            <h3 id="k-item" style="margin: 0; font-size: 13px; line-height: 16px; font-weight: 600; color: {{ink2}};">Item page</h3>
+            <dl style="margin: 0; display: flex; flex-direction: column;">
+              <div style="display: grid; grid-template-columns: 118px 1fr; column-gap: 10px; align-items: center; min-height: 30px;"><dt style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: {{ink3}};"><kbd style="display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyBg}}; color: {{ink}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">j</kbd><span aria-hidden="true">/</span><kbd style="display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyBg}}; color: {{ink}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">→</kbd></dt><dd style="margin: 0;">Next item</dd></div>
+              <div style="display: grid; grid-template-columns: 118px 1fr; column-gap: 10px; align-items: center; min-height: 30px;"><dt style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: {{ink3}};"><kbd style="display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyBg}}; color: {{ink}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">k</kbd><span aria-hidden="true">/</span><kbd style="display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyBg}}; color: {{ink}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">←</kbd></dt><dd style="margin: 0;">Previous item</dd></div>
+              <div style="display: grid; grid-template-columns: 118px 1fr; column-gap: 10px; align-items: center; min-height: 30px;"><dt style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: {{ink3}};"><kbd style="display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyBg}}; color: {{ink}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">1–9</kbd></dt><dd style="margin: 0;">Choose an option <span style="color: {{ink3}};">last is Other…</span></dd></div>
+              <div style="display: grid; grid-template-columns: 118px 1fr; column-gap: 10px; align-items: center; min-height: 30px;"><dt style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: {{ink3}};"><kbd style="display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyBg}}; color: {{ink}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">Enter</kbd></dt><dd style="margin: 0;">Submit</dd></div>
+              <div style="display: grid; grid-template-columns: 118px 1fr; column-gap: 10px; align-items: center; min-height: 30px;"><dt style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: {{ink3}};"><kbd style="display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyBg}}; color: {{ink}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">Ctrl/⌘</kbd><span aria-hidden="true">+</span><kbd style="display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyBg}}; color: {{ink}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">Enter</kbd></dt><dd style="margin: 0;">Submit or send <span style="color: {{ink3}};">from a text field</span></dd></div>
+              <div style="display: grid; grid-template-columns: 118px 1fr; column-gap: 10px; align-items: center; min-height: 30px;"><dt style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: {{ink3}};"><kbd style="display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyBg}}; color: {{ink}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">a</kbd></dt><dd style="margin: 0;">Ask a question</dd></div>
+              <div style="display: grid; grid-template-columns: 118px 1fr; column-gap: 10px; align-items: center; min-height: 30px;"><dt style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: {{ink3}};"><kbd style="display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyBg}}; color: {{ink}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">y</kbd></dt><dd style="margin: 0;">Looks good <span style="color: {{ink3}};">FYI</span></dd></div>
+              <div style="display: grid; grid-template-columns: 118px 1fr; column-gap: 10px; align-items: center; min-height: 30px;"><dt style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: {{ink3}};"><kbd style="display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyBg}}; color: {{ink}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">o</kbd></dt><dd style="margin: 0;">Override <span style="color: {{ink3}};">FYI</span></dd></div>
+              <div style="display: grid; grid-template-columns: 118px 1fr; column-gap: 10px; align-items: center; min-height: 30px;"><dt style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: {{ink3}};"><kbd style="display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyBg}}; color: {{ink}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">s</kbd></dt><dd style="margin: 0;">Snooze</dd></div>
+              <div style="display: grid; grid-template-columns: 118px 1fr; column-gap: 10px; align-items: center; min-height: 30px;"><dt style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: {{ink3}};"><kbd style="display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyBg}}; color: {{ink}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">u</kbd><span aria-hidden="true">/</span><kbd style="display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyBg}}; color: {{ink}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">Esc</kbd></dt><dd style="margin: 0;">Back to the list</dd></div>
+            </dl>
+          </section>
+          <section aria-labelledby="k-inbox" style="display: flex; flex-direction: column; gap: 6px; min-width: 0;">
+            <h3 id="k-inbox" style="margin: 0; font-size: 13px; line-height: 16px; font-weight: 600; color: {{ink2}};">Inbox</h3>
+            <dl style="margin: 0; display: flex; flex-direction: column;">
+              <div style="display: grid; grid-template-columns: 74px 1fr; column-gap: 10px; align-items: center; min-height: 30px;"><dt style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: {{ink3}};"><kbd style="display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyBg}}; color: {{ink}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">j</kbd><span aria-hidden="true">/</span><kbd style="display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyBg}}; color: {{ink}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">↓</kbd></dt><dd style="margin: 0;">Next row</dd></div>
+              <div style="display: grid; grid-template-columns: 74px 1fr; column-gap: 10px; align-items: center; min-height: 30px;"><dt style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: {{ink3}};"><kbd style="display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyBg}}; color: {{ink}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">k</kbd><span aria-hidden="true">/</span><kbd style="display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyBg}}; color: {{ink}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">↑</kbd></dt><dd style="margin: 0;">Previous row</dd></div>
+              <div style="display: grid; grid-template-columns: 74px 1fr; column-gap: 10px; align-items: center; min-height: 30px;"><dt style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: {{ink3}};"><kbd style="display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyBg}}; color: {{ink}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">Enter</kbd></dt><dd style="margin: 0;">Open</dd></div>
+              <div style="display: grid; grid-template-columns: 74px 1fr; column-gap: 10px; align-items: center; min-height: 30px;"><dt style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: {{ink3}};"><kbd style="display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyBg}}; color: {{ink}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">/</kbd></dt><dd style="margin: 0;">Search History</dd></div>
+            </dl>
+          </section>
+          <section aria-labelledby="k-any" style="display: flex; flex-direction: column; gap: 6px; min-width: 0;">
+            <h3 id="k-any" style="margin: 0; font-size: 13px; line-height: 16px; font-weight: 600; color: {{ink2}};">Anywhere</h3>
+            <dl style="margin: 0; display: flex; flex-direction: column;">
+              <div style="display: grid; grid-template-columns: 74px 1fr; column-gap: 10px; align-items: center; min-height: 30px;"><dt style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: {{ink3}};"><kbd style="display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyBg}}; color: {{ink}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">g</kbd><kbd style="display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyBg}}; color: {{ink}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">i</kbd></dt><dd style="margin: 0;">Inbox</dd></div>
+              <div style="display: grid; grid-template-columns: 74px 1fr; column-gap: 10px; align-items: center; min-height: 30px;"><dt style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: {{ink3}};"><kbd style="display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyBg}}; color: {{ink}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">g</kbd><kbd style="display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyBg}}; color: {{ink}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">t</kbd></dt><dd style="margin: 0;">Team</dd></div>
+              <div style="display: grid; grid-template-columns: 74px 1fr; column-gap: 10px; align-items: center; min-height: 30px;"><dt style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: {{ink3}};"><kbd style="display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyBg}}; color: {{ink}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">g</kbd><kbd style="display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyBg}}; color: {{ink}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">h</kbd></dt><dd style="margin: 0;">History</dd></div>
+              <div style="display: grid; grid-template-columns: 74px 1fr; column-gap: 10px; align-items: center; min-height: 30px;"><dt style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: {{ink3}};"><kbd style="display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyBg}}; color: {{ink}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">g</kbd><kbd style="display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyBg}}; color: {{ink}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">s</kbd></dt><dd style="margin: 0;">Settings</dd></div>
+              <div style="display: grid; grid-template-columns: 74px 1fr; column-gap: 10px; align-items: center; min-height: 30px;"><dt style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: {{ink3}};"><kbd style="display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyBg}}; color: {{ink}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">?</kbd></dt><dd style="margin: 0;">Show this help</dd></div>
+              <div style="display: grid; grid-template-columns: 74px 1fr; column-gap: 10px; align-items: center; min-height: 30px;"><dt style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: {{ink3}};"><kbd style="display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border: 1px solid {{keyLine}}; border-bottom-width: 2px; border-radius: 5px; background: {{keyBg}}; color: {{ink}}; font-family: inherit; font-size: 12px; line-height: 1; font-weight: 600; font-stretch: 90%;">Esc</kbd></dt><dd style="margin: 0;">Leave a text field</dd></div>
+            </dl>
+          </section>
+    </div>
+    <p style="margin: 0; padding-top: 12px; border-top: 1px solid {{line}}; font-size: 13px; line-height: 18px; color: {{ink2}};">Esc closes the snooze menu first. After each decision, keys pause for a moment so a held key can’t decide the next item. Hints hide on touch screens.</p>
+  </section>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":true},"hints":{"editor":"boolean","default":true},"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const dark = !(this.props.dark === false || this.props.dark === 'false');
+    const hints = !(this.props.hints === false || this.props.hints === 'false');
+    const t = dark
+      ? { bg: '#0c0f14', pane: '#10131a', card: '#141821', cardSel: '#1d2230', btn: '#1d2230', sunk: '#07090c', field: '#0a0d12', fieldEdge: 'inset 0 0 0 1px rgba(255, 255, 255, 0.1), inset 0 1px 2px rgba(0, 0, 0, 0.5)', ink: '#e8ebf1', ink2: '#b4bcc8', ink3: '#8a93a2', line: 'rgba(255, 255, 255, 0.07)', lineStrong: 'rgba(255, 255, 255, 0.16)', accent: '#93a6ff', onAccent: '#0a1240', accentText: '#a3b3ff', accentSoft: 'rgba(147, 166, 255, 0.14)', hi: '#ff8f80', hiText: '#ffa094', ok: '#5fd49a', okText: '#74dca8', elev: 'inset 0 1px 0 rgba(255, 255, 255, 0.045), 0 1px 2px rgba(0, 0, 0, 0.5)', elevBtn: 'inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 1px 2px rgba(0, 0, 0, 0.5)', elevSeg: 'inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 1px 2px rgba(0, 0, 0, 0.5)', selRing: '0 0 0 1.5px #93a6ff, 0 0 0 5px rgba(147, 166, 255, 0.14), 0 0 28px rgba(147, 166, 255, 0.16)', glow: '0 0 12px rgba(147, 166, 255, 0.6)', glowHi: '0 0 8px rgba(255, 143, 128, 0.6)', glowOk: '0 0 8px rgba(95, 212, 154, 0.75)', glowInk: '0 0 10px rgba(232, 235, 241, 0.22)', ctaGlow: '0 0 20px rgba(147, 166, 255, 0.3)', track: '#2a303c', keyBg: '#1d2230', keyLine: 'rgba(255, 255, 255, 0.16)', keyInk: '#b4bcc8', keyAccBg: 'rgba(10, 18, 64, 0.12)', keyAccLine: 'rgba(10, 18, 64, 0.4)', sheet: '#141821', shadow: '0 24px 64px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.06)', scrim: 'rgba(4, 6, 10, 0.68)' }
+      : { bg: '#f4f5f7', pane: '#ffffff', card: '#ffffff', cardSel: '#ffffff', btn: '#ffffff', sunk: '#e6e9ed', field: '#ffffff', fieldEdge: 'inset 0 0 0 1px #bcc3cc', ink: '#14181d', ink2: '#424a54', ink3: '#5a636e', line: '#dde1e6', lineStrong: '#bcc3cc', accent: '#2d46c0', onAccent: '#ffffff', accentText: '#2d46c0', accentSoft: '#e5e9fa', hi: '#c0271c', hiText: '#b0241a', ok: '#1f8a55', okText: '#17693f', elev: '0 0 0 1px #dde1e6', elevBtn: '0 0 0 1px #bcc3cc', elevSeg: '0 1px 2px rgba(20, 24, 29, 0.14)', selRing: '0 0 0 2px #2d46c0', glow: 'none', glowHi: 'none', glowOk: '0 0 0 3px #d3eedf', glowInk: 'none', ctaGlow: 'none', track: '#bcc3cc', keyBg: '#ffffff', keyLine: '#bcc3cc', keyInk: '#424a54', keyAccBg: 'rgba(255, 255, 255, 0.14)', keyAccLine: 'rgba(255, 255, 255, 0.5)', sheet: '#ffffff', shadow: '0 16px 48px rgba(20, 24, 29, 0.18)', scrim: 'rgba(20, 24, 29, 0.38)' };
+    t.kbd = hints ? 'inline-flex' : 'none';
+    t.kbdFlex = hints ? 'flex' : 'none';
+    return t;
+  }
+}
+</script>
+</body>
+</html>

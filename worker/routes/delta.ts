@@ -1,0 +1,179 @@
+// GET /api/state/delta?since=<cursor>: the part of the caller's /api/state that changed since a cursor, so an
+// open page applies a few docs instead of refetching the whole snapshot on every change (docs/api.md, "State
+// delta"). It reads the change log after `since` with /api/changes' visibility rules, dedupes the docs it names
+// and fetches their current versions, all in one batch (one transaction), so the cursor matches the docs exactly.
+
+import type {
+  Doc,
+  Item,
+  Lease,
+  ManagerMeta,
+  Orchestrator,
+  Schedule,
+  StateDelta,
+  StateDeltaReset,
+} from "../../shared/types.ts";
+import { orchestratorScope } from "../auth.ts";
+import { badRequest, json } from "../http.ts";
+import type { Ctx, Route } from "../router.ts";
+import { COLS, toDoc, type DocRow } from "../store.ts";
+import { routinesSql } from "../reviews.ts";
+import { toPerson } from "../users.ts";
+import { scheduleView } from "./schedule.ts";
+import { PINS_SQL, pinMap, routineState } from "./state.ts";
+
+// At most this many change rows after `since`; further behind, a full /api/state is the cheaper read.
+export const DELTA_MAX_CHANGES = 500;
+
+function sinceParam(c: Ctx): number {
+  const raw = c.url.searchParams.get("since");
+  if (raw === null || !/^\d+$/.test(raw)) throw badRequest("since must be a non-negative integer (a cursor from /api/state)");
+  return Number(raw);
+}
+
+// The shared head of every statement in the batch, which binds the same five parameters to each (`p` only
+// names them all, so every statement takes five): ?1 since, ?2 the orchestrator scope ('' for none), ?3 the
+// caller's actor for snoozes and pins ('' for a token), ?4 their email, ?5 now. They are used directly, not through `p`,
+// so `seq > ?1` stays a range scan of the primary key.
+//
+// `ok` is 1 when the log still holds every change after `since` and there are at most DELTA_MAX_CHANGES of
+// them: seq is AUTOINCREMENT and never reused, so cursor - since rows must be there, and fewer means some were
+// pruned (by age, so possibly from the middle when an imported doc carried an old updated_at). The CASE keeps
+// the count to a short range scan. `ch` is each doc (collection, doc_id) the caller may see changed after
+// `since`, deduped; empty unless ok.
+function head(scoped: boolean): string {
+  // As /api/changes (SCOPE_FILTER there), plus two rows /api/changes doesn't show an orchestrator token:
+  // meta/schedule, which its /api/state includes, and later changes to an item it had owned (reassigned away,
+  // logged under the new orchestrator), so the item leaves its state as it would on a refetch. Only ids it
+  // already knew come back that way, as deletes.
+  const scope = scoped
+    ? `AND (orchestrator = ?2 OR (collection = 'meta' AND doc_id = 'schedule')
+         OR (collection = 'items' AND doc_id IN (SELECT doc_id FROM changes WHERE orchestrator = ?2 AND collection = 'items')))`
+    : "";
+  return `WITH p AS (SELECT ?1, ?2, ?3, ?4, ?5),
+  head AS (SELECT coalesce(max(seq), 0) AS cursor FROM changes),
+  ok AS (
+    SELECT CASE WHEN cursor - ?1 BETWEEN 0 AND ${DELTA_MAX_CHANGES}
+      THEN (SELECT count(*) FROM changes WHERE seq > ?1) = cursor - ?1 ELSE 0 END AS ok
+    FROM head),
+  ch AS (
+    SELECT DISTINCT collection, doc_id FROM changes NOT INDEXED
+    WHERE seq > ?1 AND (SELECT ok FROM ok)
+      -- Snoozes and pins reach only their own human (SNOOZE_FILTER in changes.ts).
+      AND (collection NOT IN ('snoozes', 'pins') OR actor = ?3)
+      ${scope})
+  `;
+}
+
+// Whether the count of archived items may differ from what it was at `since`, so the delta recounts (an index
+// scan of every archived item, the costliest read here) only then. For each item in the window: is it archived
+// now, and was it at `since`, by its last change at or before the cursor (a delete: not there, so no), or, when
+// it has none, not there yet if its first change in the window created it. An item whose history was pruned
+// can't be told, so it counts as a change. An orchestrator token's count also moves when an item is reassigned
+// to or from it, so any item change recounts there (its items are few).
+function archivedMayChange(scoped: boolean): string {
+  if (scoped) return "EXISTS (SELECT 1 FROM ch WHERE collection = 'items')";
+  return `EXISTS (SELECT 1 FROM ch WHERE ch.collection = 'items' AND
+    coalesce((SELECT status = 'archived' FROM docs WHERE collection = 'items' AND id = ch.doc_id), 0) IS NOT coalesce(
+      (SELECT CASE WHEN op = 'delete' THEN 0 ELSE coalesce(status = 'archived', 0) END FROM changes
+        WHERE collection = 'items' AND doc_id = ch.doc_id AND seq <= ?1 ORDER BY seq DESC LIMIT 1),
+      (SELECT CASE WHEN op = 'create' THEN 0 END FROM changes
+        WHERE collection = 'items' AND doc_id = ch.doc_id AND seq > ?1 ORDER BY seq LIMIT 1)))`;
+}
+
+// The docs /api/state would show the caller, of `d`.
+function visibleDocs(scoped: boolean): string {
+  return scoped
+    ? `(d.collection = 'items' AND d.orchestrator = ?2)
+       OR (d.collection = 'orchestrators' AND d.id = ?2)
+       OR (d.collection = 'meta' AND d.id = 'schedule')`
+    : `d.collection IN ('items', 'orchestrators') OR (d.collection = 'meta' AND d.id IN ('manager', 'lease', 'schedule'))`;
+}
+
+const D_COLS = COLS.split(", ").map((col) => `d.${col}`).join(", ");
+
+async function delta(c: Ctx): Promise<Response> {
+  const since = sinceParam(c);
+  const db = c.env.DB;
+  const scope = orchestratorScope(c.caller);
+  const scoped = scope !== null;
+  const p = c.caller.principal;
+  const email = p.kind === "human" ? p.email.toLowerCase() : "";
+  const binds = [since, scope ?? "", email ? `human:${email}` : "", email, c.now];
+  const pre = head(scoped);
+  const stmt = (sql: string) => db.prepare(pre + sql).bind(...binds);
+  const own = scoped ? " AND orchestrator = ?2" : "";
+
+  const [top, keys, docs, users, snoozes, pins, routines] = await db.batch<any>([
+    stmt(`SELECT head.cursor, ok.ok,
+      CASE WHEN ${archivedMayChange(scoped)}
+        THEN (SELECT count(*) FROM docs WHERE collection = 'items' AND status = 'archived'${own}) END AS archived
+      FROM head, ok`),
+    stmt("SELECT collection, doc_id FROM ch ORDER BY collection, doc_id"),
+    // CROSS JOIN keeps ch outermost: a primary-key lookup per changed doc, never a scan of docs.
+    stmt(`SELECT ${D_COLS} FROM ch CROSS JOIN docs AS d ON d.collection = ch.collection AND d.id = ch.doc_id
+      WHERE ${visibleDocs(scoped)}`),
+    // Orchestrator tokens see no people (and no users rows reach their ch).
+    stmt(`SELECT email, name, ntfy_topic FROM users WHERE EXISTS (SELECT 1 FROM ch WHERE collection = 'users') ORDER BY email`),
+    // The caller's snoozes still to come, as /api/state lists them.
+    stmt(`SELECT item_id, until FROM snoozes WHERE email = ?4 AND until > ?5
+      AND EXISTS (SELECT 1 FROM ch WHERE collection = 'snoozes') ORDER BY item_id`),
+    // The caller's pins, as /api/state lists them.
+    stmt(`SELECT * FROM (${PINS_SQL.replace("?1", "?4")}) WHERE EXISTS (SELECT 1 FROM ch WHERE collection = 'pins')`),
+    // Review routines, as /api/state lists them, when one changed (its head's change row is in ch).
+    stmt(`SELECT * FROM (${routinesSql("?2")}) WHERE EXISTS (SELECT 1 FROM ch WHERE collection = 'reviews') ORDER BY id`),
+  ]);
+  const { cursor, ok, archived } = top.results[0] as { cursor: number; ok: number; archived: number | null };
+  if (!ok) return json({ reset: true } satisfies StateDeltaReset);
+
+  const byKey = new Map((docs.results as DocRow[]).map((r) => [`${r.collection}\u0000${r.id}`, r]));
+  const found = (collection: string, id: string) => byKey.get(`${collection}\u0000${id}`) ?? null;
+  const body: StateDelta = {
+    cursor,
+    items: [],
+    orchestrators: [],
+    deleted: [],
+    qa_changed: [],
+    me: p,
+  };
+  if (archived !== null) body.archived_total = archived;
+  const qa = new Set<string>();
+  const reviews: string[] = [];
+  for (const { collection, doc_id: id } of keys.results as { collection: string; doc_id: string }[]) {
+    if (collection === "items" || collection === "orchestrators") {
+      const row = found(collection, id);
+      if (!row) body.deleted.push({ collection, id });
+      else if (collection === "items") body.items.push(toDoc<Item>(row));
+      else body.orchestrators.push(toDoc<Orchestrator>(row));
+    } else if (collection.startsWith("items/") && collection.endsWith("/qa")) {
+      qa.add(collection.slice("items/".length, -"/qa".length));
+    } else if (collection === "meta") {
+      const row = found("meta", id);
+      // Tokens scoped to an orchestrator get manager and lease as null in /api/state, and no rows for them here.
+      if (id === "manager") body.manager = row && toDoc<ManagerMeta>(row);
+      else if (id === "lease") body.lease = row && toDoc<Lease>(row);
+      else if (id === "schedule") body.schedule = scheduleView(row && toDoc<Schedule>(row));
+    } else if (collection === "users") {
+      body.people = scoped ? [] : users.results.map(toPerson);
+    } else if (collection === "reviews") {
+      reviews.push(id);
+    } else if (collection === "snoozes") {
+      body.snoozes = Object.fromEntries(snoozes.results.map((r: { item_id: string; until: string }) => [r.item_id, r.until]));
+    } else if (collection === "pins") {
+      body.pins = pinMap(pins.results);
+    }
+  }
+  body.items.sort(byCreated);
+  body.orchestrators.sort(byCreated);
+  body.qa_changed = [...qa].sort();
+  if (reviews.length) {
+    body.reviews_changed = reviews; // keys come sorted
+    body.routines = routines.results.map(routineState);
+  }
+  return json(body);
+}
+
+const byCreated = (a: Doc<unknown>, b: Doc<unknown>) =>
+  a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+
+export const deltaRoutes: Route[] = [["GET", "/state/delta", delta]];

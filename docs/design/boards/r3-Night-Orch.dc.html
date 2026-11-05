@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Night team</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wdth,wght@0,75..100,400..700;1,75..100,400..700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#a3b3ff}a:hover{color:#c3ceff}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; position: relative; overflow: hidden; background: {{base}}; color: {{ink}}; font-family: 'Instrument Sans', sans-serif; font-size: 15px; line-height: 20px; font-variant-numeric: tabular-nums;">
+
+  <div style="padding: 4px 16px 0; display: flex; flex-direction: column;">
+
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; height: 48px;">
+      <h1 style="margin: 0; display: flex; align-items: baseline; gap: 7px; font-size: 17px; line-height: 22px; font-weight: 600; letter-spacing: -0.01em;"><span style="font-size: 34px; line-height: 38px; font-weight: 600; font-stretch: 78%; color: {{ink}}; text-shadow: {{glowInk}};">4</span>on the team</h1>
+      <button type="button" aria-expanded="false" aria-controls="team-strip" style="min-height: 44px; padding: 0 4px 0 12px; border: 0; background: transparent; color: {{ink2}}; font: inherit; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 4px;">Full list<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></button>
+    </div>
+
+    <nav id="team-strip" aria-label="Orchestrators" style="margin-top: 6px; display: grid; grid-template-columns: repeat(4, 1fr); border-radius: 14px; background: {{raised}}; box-shadow: {{elev}}; overflow: hidden;">
+      <a href="Night-Orch.dc.html" aria-label="O2, blocked, 1 open ask" style="min-height: 60px; padding: 9px 10px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; gap: 3px; color: {{ink}}; text-decoration: none;">
+        <span style="display: flex; align-items: baseline; justify-content: space-between;"><span style="font-size: 18px; line-height: 20px; font-weight: 600; font-stretch: 80%;">O2</span><span style="font-size: 13px; font-weight: 600; font-stretch: 82%; color: {{ink2}};">1</span></span>
+        <span style="display: flex; align-items: center; gap: 5px; font-size: 12px; line-height: 16px; color: {{hiText}}; font-weight: 600;"><span aria-hidden="true" style="width: 6px; height: 6px; border-radius: 50%; background: {{hi}}; box-shadow: {{glowHi}};"></span>Blocked</span>
+      </a>
+      <a href="Night-Orch.dc.html" aria-current="page" aria-label="O3, running, 1 open ask" style="position: relative; min-height: 60px; padding: 9px 10px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; gap: 3px; background: {{raised2}}; box-shadow: inset 1px 0 0 {{hair}}, inset -1px 0 0 {{hair}}; color: {{ink}}; text-decoration: none;">
+        <span style="display: flex; align-items: baseline; justify-content: space-between;"><span style="font-size: 18px; line-height: 20px; font-weight: 600; font-stretch: 80%; color: {{accentText}}; text-shadow: {{glow}};">O3</span><span style="font-size: 13px; font-weight: 600; font-stretch: 82%; color: {{accentText}};">1</span></span>
+        <span style="display: flex; align-items: center; gap: 5px; font-size: 12px; line-height: 16px; color: {{okText}}; font-weight: 600;"><span aria-hidden="true" style="width: 6px; height: 6px; border-radius: 50%; background: {{ok}}; box-shadow: {{glowOk}};"></span>Running</span>
+        <span aria-hidden="true" style="position: absolute; left: 10px; right: 10px; bottom: 0; height: 2px; border-radius: 2px 2px 0 0; background: {{accent}}; box-shadow: {{glow}};"></span>
+      </a>
+      <a href="Night-Orch.dc.html" aria-label="O5, running, nothing open" style="min-height: 60px; padding: 9px 10px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; gap: 3px; color: {{ink}}; text-decoration: none;">
+        <span style="font-size: 18px; line-height: 20px; font-weight: 600; font-stretch: 80%;">O5</span>
+        <span style="display: flex; align-items: center; gap: 5px; font-size: 12px; line-height: 16px; color: {{okText}}; font-weight: 600;"><span aria-hidden="true" style="width: 6px; height: 6px; border-radius: 50%; background: {{ok}}; box-shadow: {{glowOk}};"></span>Running</span>
+      </a>
+      <a href="Night-Orch.dc.html" aria-label="O1, PR open, 1 open ask" style="min-height: 60px; padding: 9px 10px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; gap: 3px; border-left: 1px solid {{hair}}; color: {{ink}}; text-decoration: none;">
+        <span style="display: flex; align-items: baseline; justify-content: space-between;"><span style="font-size: 18px; line-height: 20px; font-weight: 600; font-stretch: 80%;">O1</span><span style="font-size: 13px; font-weight: 600; font-stretch: 82%; color: {{ink2}};">1</span></span>
+        <span style="display: flex; align-items: center; gap: 5px; font-size: 12px; line-height: 16px; color: {{ink2}}; font-weight: 600;"><svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.5"></circle><circle cx="6" cy="18" r="2.5"></circle><circle cx="18" cy="18" r="2.5"></circle><path d="M6 8.5v7M18 15.5V10a3 3 0 0 0-3-3h-3"></path></svg>PR open</span>
+      </a>
+    </nav>
+
+    <article aria-labelledby="orch-goal" style="margin-top: 18px; display: flex; flex-direction: column;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; line-height: 18px;">
+        <span style="font-weight: 600; color: {{ink2}};">O3 orchestrator briefing</span>
+        <span style="color: {{ink3}};">updated <span style="font-size: 14px; font-weight: 500; font-stretch: 82%; color: {{ink2}}; text-shadow: {{glowInk}};">12m</span> ago</span>
+      </div>
+      <h2 id="orch-goal" style="margin: 6px 0 0; font-size: 22px; line-height: 28px; font-weight: 600; letter-spacing: -0.012em;">Only human edits wake the manager</h2>
+
+      <div style="margin-top: 14px; display: grid; grid-template-columns: 72px 1fr; column-gap: 12px; row-gap: 14px; font-size: 15px; line-height: 21px;">
+        <h3 style="margin: 0; font-size: 13px; line-height: 21px; font-weight: 600; color: {{ink3}};">Why</h3>
+        <p style="margin: 0; color: {{ink2}};">The manager wakes on every D1 write. A change log lets it sleep until a person actually edits something.</p>
+        <h3 style="margin: 0; font-size: 13px; line-height: 21px; font-weight: 600; color: {{ink3}};">Where it stands</h3>
+        <p style="margin: 0; color: {{ink2}};">Triggers on docs and items write change rows. Imports are the gap: 400 imported docs woke the manager 400 times.</p>
+      </div>
+
+      <section aria-labelledby="needs" style="margin-top: 16px; display: flex; flex-direction: column; gap: 8px;">
+        <h3 id="needs" style="margin: 0; display: flex; align-items: baseline; gap: 8px; font-size: 13px; line-height: 18px; font-weight: 600; color: {{ink2}};">Needs from you <span style="font-weight: 500; color: {{ink3}};"><span style="font-stretch: 82%; color: {{accentText}}; text-shadow: {{glow}};">1</span> open</span></h3>
+        <p style="margin: 0; font-size: 15px; line-height: 21px;">A call on where change rows get written. O3 is idle until then.</p>
+        <a href="Night-Focus.dc.html" style="display: grid; grid-template-columns: 8px 1fr 16px; column-gap: 11px; align-items: start; padding: 10px 10px 10px 12px; border-radius: 14px; background: {{raised}}; box-shadow: {{elev}}; color: {{ink}}; text-decoration: none;">
+          <span aria-hidden="true" style="margin-top: 6px; width: 8px; height: 8px; border-radius: 50%; background: {{hi}}; box-shadow: {{glowHi}};"></span>
+          <span style="display: flex; flex-direction: column; gap: 2px; min-width: 0;">
+            <span style="font-weight: 500;">Keep D1 triggers, or write change rows in the Worker?</span>
+            <span style="display: flex; align-items: center; gap: 10px; white-space: nowrap; font-size: 13px; line-height: 18px; color: {{ink3}};"><span>Decision</span><span>High</span><span style="display: inline-flex; align-items: center; gap: 5px; color: {{accentText}}; font-weight: 600;"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 50%; background: {{accent}}; box-shadow: {{glow}};"></span>Answered</span><span style="margin-left: auto; font-size: 14px; font-weight: 500; font-stretch: 82%; color: {{ink2}}; text-shadow: {{glowInk}};">19m</span></span>
+          </span>
+          <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-top: 2px; color: {{ink3}};"><path d="M9 6l6 6-6 6"></path></svg>
+        </a>
+      </section>
+
+      <dl style="margin: 16px 0 0; display: grid; grid-template-columns: 1fr 1fr; border-radius: 14px; background: {{raised}}; box-shadow: {{elev}};">
+        <div style="padding: 9px 12px; display: flex; flex-direction: column; gap: 2px;">
+          <dt style="font-size: 12px; line-height: 16px; color: {{ink3}};">Pull request</dt>
+          <dd style="margin: 0; font-size: 14px; line-height: 20px; color: {{ink2}};">None yet</dd>
+        </div>
+        <div style="padding: 9px 12px; display: flex; flex-direction: column; gap: 2px; border-left: 1px solid {{hair}};">
+          <dt style="font-size: 12px; line-height: 16px; color: {{ink3}};">Session</dt>
+          <dd style="margin: 0; font-size: 14px; line-height: 20px;"><a href="#o3-session" style="color: {{accentText}}; font-weight: 600; text-decoration: none;">O3 change log</a></dd>
+        </div>
+      </dl>
+
+      <a href="#o3-chat" style="margin-top: 12px; min-height: 48px; border-radius: 14px; background: {{raised2}}; box-shadow: {{elevBtn}}; color: {{accentText}}; text-decoration: none; font-size: 16px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px;">
+        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a7.5 7.5 0 0 1-11 6.6L4 20l1.4-4.6A7.5 7.5 0 1 1 20 12z"></path></svg>Open O3 chat</a>
+    </article>
+
+  </div>
+
+  <nav aria-label="Main" style="position: absolute; left: 0; right: 0; bottom: 0; box-sizing: border-box; height: 66px; padding: 6px 12px 10px; background: {{bar}}; box-shadow: {{barEdge}}; display: grid; grid-template-columns: 1fr 1fr 1.7fr 1fr 1fr; gap: 4px; align-items: stretch;">
+    <a href="Night-Queue.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: {{ink3}}; text-decoration: none; font-size: 12px; line-height: 14px; font-weight: 500;">
+      <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13l3-8h12l3 8v6H3z"></path><path d="M3 13h5l1 3h6l1-3h5"></path></svg>Inbox 6</a>
+    <a href="Night-Orch.dc.html" aria-current="page" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: {{ink}}; text-decoration: none; font-size: 12px; line-height: 14px; font-weight: 600;">
+      <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"></path><path d="M16 4.8a3.3 3.3 0 0 1 0 6.4"></path><path d="M18 14.8c1.8.7 3 2.5 3.5 5.2"></path></svg>Team 4</a>
+    <a href="Night-Focus.dc.html" style="display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 14px; background: {{accent}}; box-shadow: {{ctaGlow}}; color: {{onAccent}}; text-decoration: none; font-size: 16px; font-weight: 600;">
+      <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="6.5"></circle><path d="M12 2v4M12 18v4M2 12h4M18 12h4"></path></svg>Focus <span style="font-stretch: 82%;">5</span></a>
+    <button type="button" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 0; border: 0; background: transparent; color: {{ink3}}; font: inherit; font-size: 12px; line-height: 14px; font-weight: 500;">
+      <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 12a8.5 8.5 0 1 0 2.5-6"></path><path d="M3 4v4h4"></path><path d="M12 8v4l3 2"></path></svg>History</button>
+    <button type="button" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 0; border: 0; background: transparent; color: {{ink3}}; font: inherit; font-size: 12px; line-height: 14px; font-weight: 500;">
+      <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"></path><circle cx="16" cy="7" r="2"></circle><circle cx="10" cy="17" r="2"></circle></svg>Settings</button>
+  </nav>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"light":{"editor":"boolean","default":false},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const light = this.props.light === true || this.props.light === 'true';
+    if (light) {
+      return { base: '#eef1f5', raised: '#ffffff', raised2: '#ffffff', bar: '#ffffff', hair: 'rgba(16, 20, 27, 0.08)', ink: '#10141b', ink2: '#3d4552', ink3: '#566070', accent: '#3247c4', accentText: '#2f43bd', onAccent: '#ffffff', hi: '#c42a1e', hiText: '#b3261b', ok: '#1d8250', okText: '#17693f', elev: '0 0 0 1px rgba(16, 20, 27, 0.06), 0 1px 2px rgba(16, 20, 27, 0.06)', elevBtn: '0 0 0 1px rgba(16, 20, 27, 0.16)', barEdge: 'inset 0 1px 0 rgba(16, 20, 27, 0.08)', glow: 'none', glowInk: 'none', glowOk: '0 0 0 3px rgba(29, 130, 80, 0.16)', glowHi: 'none', ctaGlow: 'none' };
+    }
+    return { base: '#0c0f14', raised: '#141821', raised2: '#1d2230', bar: '#10131a', hair: 'rgba(255, 255, 255, 0.07)', ink: '#e8ebf1', ink2: '#b4bcc8', ink3: '#8a93a2', accent: '#93a6ff', accentText: '#a3b3ff', onAccent: '#0a1240', hi: '#ff8f80', hiText: '#ffa094', ok: '#5fd49a', okText: '#74dca8', elev: 'inset 0 1px 0 rgba(255, 255, 255, 0.045), 0 1px 2px rgba(0, 0, 0, 0.5)', elevBtn: 'inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 1px 2px rgba(0, 0, 0, 0.5)', barEdge: 'inset 0 1px 0 rgba(255, 255, 255, 0.06)', glow: '0 0 12px rgba(147, 166, 255, 0.6)', glowInk: '0 0 10px rgba(232, 235, 241, 0.22)', glowOk: '0 0 6px rgba(95, 212, 154, 0.75)', glowHi: '0 0 6px rgba(255, 143, 128, 0.6)', ctaGlow: '0 0 20px rgba(147, 166, 255, 0.3)' };
+  }
+}
+</script>
+</body>
+</html>
