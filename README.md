@@ -11,7 +11,7 @@ Agents post items with the `agent-inbox` CLI. You get a notification, read a bri
   <img src="docs/screenshots/2-item.png" alt="A decision item: the question, options with tradeoffs, and a recommendation" width="320">
 </p>
 
-On a laptop: [an item page](docs/screenshots/3-item-desktop.png) and [the keyboard shortcuts](docs/screenshots/4-shortcuts.png). Dark: [a manager briefing](docs/screenshots/5-orch-dark.png), [Settings](docs/screenshots/6-settings-dark.png) and [Reviews](docs/screenshots/7-reviews-desktop.png).
+On a laptop: [an item page](docs/screenshots/3-item-desktop.png), [the keyboard shortcuts](docs/screenshots/4-shortcuts.png) and [Reviews](docs/screenshots/7-reviews-desktop.png). Dark: [a manager briefing](docs/screenshots/5-orch-dark.png) and [Settings](docs/screenshots/6-settings-dark.png).
 
 **Status:** early but in daily use. One deployment is one inbox (single-tenant): everyone Cloudflare Access lets in shares it, with the role an admin gives them. The CLI and HTTP API stay backward compatible; the UI changes freely. There is no hosted version. Source-available under [FSL-1.1-MIT](#license).
 
