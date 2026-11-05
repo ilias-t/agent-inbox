@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { main } from "../../cli/main.mjs";
 import { resolveConfig } from "../../cli/config.mjs";
+import { projectDirs, sessionDirs } from "../../cli/relink.mjs";
 
 interface SeenRequest {
   method: string;
@@ -933,5 +934,30 @@ describe("orch relink", () => {
     expect(none.stdout).toContain("no live session; link kept");
     expect((await run(["orch", "relink"], { env })).code).toBe(2);
     rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("defaults to Claude Code's own directories; a set override replaces them", () => {
+    expect(sessionDirs({}, "/h")).toEqual(["/h/.claude/sessions"]);
+    expect(projectDirs({}, "/h")).toEqual(["/h/.claude/projects"]);
+    expect(sessionDirs({ AGENT_INBOX_SESSION_DIRS: "/a/sessions::/b/sessions" }, "/h")).toEqual(["/a/sessions", "/b/sessions"]);
+    expect(projectDirs({ AGENT_INBOX_PROJECT_DIRS: "/a/projects" }, "/h")).toEqual(["/a/projects"]);
+  });
+
+  it("without the overrides, reads ~/.claude/sessions and nothing beside it", async () => {
+    const sessions = join(home, ".claude", "sessions"), other = join(home, ".claude-other", "sessions");
+    mkdirSync(sessions, { recursive: true });
+    mkdirSync(other, { recursive: true });
+    writeFileSync(join(sessions, `${process.pid}.json`), JSON.stringify({ sessionId: SID, bridgeSessionId: "session_HOME1" }));
+    writeFileSync(join(other, `${process.pid}.json`), JSON.stringify({ sessionId: "other", bridgeSessionId: "session_OTHER" }));
+    handler = list([
+      doc("O1", { status: "running", session_id: SID, session_url: "https://claude.ai/code/cse_OLD1" }),
+      doc("O2", { status: "running", session_id: "other", session_url: "https://claude.ai/code/cse_KEEP" }),
+    ]);
+    const r = await run(["orch", "relink", "--all"]);
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain("O1: relinked https://claude.ai/code/cse_HOME1");
+    expect(r.stdout).toContain("O2: no live session; link kept");
+    rmSync(join(home, ".claude"), { recursive: true, force: true });
+    rmSync(join(home, ".claude-other"), { recursive: true, force: true });
   });
 });
