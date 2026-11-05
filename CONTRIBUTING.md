@@ -4,7 +4,7 @@ Thanks for helping. Bug reports and ideas go in [issues](https://github.com/ilia
 
 ## Setup
 
-Follow the README's [Try it locally](README.md#try-it-locally): Node ≥ 22.9, `npm ci`, a `wrangler.jsonc` copied from `wrangler.example.jsonc`, `.dev.vars` from `.dev.vars.example`, and `npm run worker:dev`. You don't need a Cloudflare account; everything runs against a local D1 in `.wrangler/`.
+Follow the README's [Try it locally](README.md#try-it-locally): Node ≥ 22.12, `npm ci`, a `wrangler.jsonc` copied from `wrangler.example.jsonc`, `.dev.vars` from `.dev.vars.example`, and `npm run worker:dev`. You don't need a Cloudflare account; everything runs against a local D1 in `.wrangler/`.
 
 For UI work, run Vite with hot reload next to the Worker:
 
@@ -60,6 +60,16 @@ Debugging a failure:
 - Locally, a failed test keeps a trace, a screenshot and `error-context.md` (the page's accessibility snapshot) in `test-results/<test>/`. Open the trace with `npx playwright show-trace test-results/<test>/trace.zip` (every action with the DOM before and after, network, console), or the HTML report with `npx playwright show-report`.
 - In CI, a failed `e2e` job uploads the `playwright-report` artifact (the HTML report, `test-results/` with the traces, and the server log). Download it from the run's Summary page, unzip it, and run `npx playwright show-report playwright-report` or `npx playwright show-trace test-results/<test>/trace.zip`; https://trace.playwright.dev opens a trace in the browser too.
 - `PWDEBUG=1 npm run e2e -- -g "<title>"` steps through one test in the Playwright Inspector.
+
+## Issues
+
+Bug reports and feature requests use the forms in the issue chooser. Planned work uses the **Task** template:
+
+- **Title:** what should happen, as an imperative phrase under 70 characters ("Record who decides from an ntfy notification").
+- **Goal** first, in one or two sentences. If it needs more, split the issue or open a tracking issue that links its parts.
+- **Why** links to the code, docs or discussion behind it. Link, don't paste.
+- **Done when** lists results someone can check, not steps. How to get there belongs in the pull request.
+- Keep it short and stick to what's known. No estimates, no guesses dressed up as facts.
 
 ## Releases
 
