@@ -103,7 +103,7 @@ jobs:
 
 How it fits together:
 
-- **One pin.** GitHub downloads the whole agent-inbox repo at the pinned commit to run the action, and the action deploys that same tree. The steps and the code can't drift apart. To ship a newer agent-inbox, change the SHA and push; every push to the deploy repo's `main` deploys.
+- **One pin.** GitHub downloads the whole agent-inbox repo at the pinned commit to run the action, and the action deploys that same tree. The steps and the code can't drift apart. To ship a newer agent-inbox, change the SHA and push; every push to the deploy repo's `main` deploys. Pin a release tag's commit with the tag in the comment (`# v0.1.0`), and Dependabot can open that bump as a PR: it checks weekly and proposes the newest release ([deploy repo template](../examples/deploy-repo/README.md#with-dependabot)).
 - **The config is generated.** The action writes the instance's wrangler config from [`wrangler.example.jsonc`](../wrangler.example.jsonc) and the inputs ([`scripts/wrangler-config.mjs`](../scripts/wrangler-config.mjs)). A binding, flag or cron added to the app reaches every instance with the next pin bump. An empty or placeholder value fails the run before migrations. You can run the script yourself to write a local `wrangler.jsonc` for an instance: `D1_DATABASE_ID=… ACCESS_TEAM_DOMAIN=… ACCESS_AUD=… PUBLIC_URL=… node scripts/wrangler-config.mjs --out wrangler.jsonc`.
 - **Logs stay private.** Deploy logs print the host and the Access team domain, and they stay in the deploy repo.
 - **Worker secrets** (`GITHUB_WEBHOOK_SECRET`, `NTFY_*`, `VAPID_*`) live on the Worker, not in the deploy repo. Set them once per instance with `npx wrangler secret put <NAME> --name <worker name>` (with that account's credentials).

@@ -26,8 +26,9 @@ jobs:
     timeout-minutes: 20
     steps:
       # The agent-inbox commit to deploy: the action's steps and the code it deploys both come from
-      # it. Pin a full commit SHA and note the version beside it.
-      - uses: <owner>/agent-inbox/.github/actions/deploy@<full commit sha> # <version or date>
+      # it. Pin the full commit SHA of a release tag and put the tag beside it (`# v0.1.0`), so
+      # Dependabot (.github/dependabot.yml) can propose the next release.
+      - uses: <owner>/agent-inbox/.github/actions/deploy@<full commit sha of a release tag> # <tag, e.g. v0.1.0>
         with:
           cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           cloudflare-account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

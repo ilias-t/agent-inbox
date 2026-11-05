@@ -16,7 +16,9 @@ Full walkthrough, including the Cloudflare side: [docs/deploy.md](../../docs/dep
 gh repo create <you>/<instance>-deploy --private --clone && cd <instance>-deploy
 mkdir -p .github/workflows
 cp <path to agent-inbox>/examples/deploy-repo/.github/workflows/deploy.yml .github/workflows/
-# edit the `uses:` line: <owner>/agent-inbox and a full commit SHA from it
+cp <path to agent-inbox>/examples/deploy-repo/.github/dependabot.yml .github/   # optional: PRs for new releases (below)
+gh api repos/<owner>/agent-inbox/commits/v0.1.0 --jq .sha   # the commit of the release you deploy
+# edit the `uses:` line: <owner>/agent-inbox, that full SHA, and `# v0.1.0` beside it
 
 R=<you>/<instance>-deploy
 gh secret set CLOUDFLARE_API_TOKEN --repo "$R"     # paste the token (Workers Scripts Edit + D1 Edit)
@@ -48,3 +50,31 @@ A missing or placeholder value fails the run before migrations, so nothing half-
 
 Change the commit SHA (and the comment beside it) in the `uses:` line and push. The run applies new
 migrations, deploys, and checks that the new Worker answers and reports the newest migration.
+
+### With Dependabot
+
+[`.github/dependabot.yml`](.github/dependabot.yml) turns on Dependabot version updates for GitHub
+Actions in the deploy repo. When agent-inbox publishes a newer version tag, Dependabot opens a PR
+that moves the pin to that tag's commit and updates the comment:
+
+```diff
+-      - uses: <owner>/agent-inbox/.github/actions/deploy@<sha of v0.1.0> # v0.1.0
++      - uses: <owner>/agent-inbox/.github/actions/deploy@<sha of v0.2.0> # v0.2.0
+```
+
+Merging the PR pushes to `main`, and that deploys. So don't turn on auto-merge: read the release notes the PR
+carries first, especially for new migrations or settings. The
+PR itself runs nothing, since the workflow runs only on pushes to `main` and by hand.
+
+What it needs:
+
+- **A pin on a release.** Pin the commit of a version tag, with that tag in a comment on the same
+  line (`# v0.1.0`). Dependabot looks the old SHA up among agent-inbox's tags, so it can rewrite the
+  comment. A comment that isn't the pinned commit's tag (a date, a branch name) stays as it is
+  while the SHA moves.
+- **Tags to move to.** It proposes only version tags (`v0.2.0`), checking weekly. A repo with no
+  version tags gets no PRs. If you pin a commit that no tag points to, Dependabot proposes the
+  latest commit on its branch rather than the next release. To track releases, pin a tagged commit.
+- **Read access.** agent-inbox is public, so a private deploy repo needs no extra credentials.
+
+Without the file, or between releases, bump the SHA by hand as above.
