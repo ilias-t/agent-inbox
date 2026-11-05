@@ -19,7 +19,7 @@ A missing section means the default in brackets. A repo without a file gets ever
 5. Shipping: <how to push and open the PR, e.g. Graphite `gt submit`; title and body conventions> [`git push` + `gh pr create`]
 6. Pre-push review: <skill or command to run> [a review subagent or `/code-review`]
 7. Reviewers: <who to request, and how (reviewers or assignees); anyone never to request> [none: leave it to the user]
-8. Merge: <"conservative" (the manager stops at a ready PR and the user merges), or the repo's merge path when it isn't `gh pr merge --squash`, e.g. a merge-queue label; plus what deploys on merge and its rollback command> [self-merge allowed under brief contract item 4's conditions]
+8. Merge: <"conservative" (the manager stops at a ready PR and the user merges), or the repo's merge path when it isn't `gh pr merge --squash`, e.g. a merge-queue label, or an approval path where the user picks a merge option on a `pr_ready` item and a script checks that decision and the PR head before merging; plus what deploys on merge and its rollback command> [self-merge allowed under brief contract item 4's conditions]
 9. Per-session resources to clean up before finishing: <e.g. throwaway test DB and its container> [none]
 
 ## Orchestrator notes

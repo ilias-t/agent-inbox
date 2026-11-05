@@ -6,6 +6,7 @@
 # Exit 0 at the slot (prints "TICK <slot> (in_hours=...)") or after MAX_WAIT (prints "KEEPALIVE ..."), 1 when the schedule can't be read.
 # Usage: <state>/ticker.sh (full path, so heartbeat.sh can see it running)
 # AGENT_INBOX_BIN overrides the CLI (default: agent-inbox on PATH), as a command line split on spaces.
+# To change the running copy, write a new file and mv it over: bash reads a script while it runs it.
 set -u
 read -ra A <<<"${AGENT_INBOX_BIN:-agent-inbox}"
 
@@ -20,4 +21,8 @@ MAX_WAIT=${MAX_WAIT:-6600}
 left=$((target - $(date +%s)))
 if (( left > MAX_WAIT )); then sleep "$MAX_WAIT"; echo "KEEPALIVE next $next"; exit 0; fi
 (( left > 0 )) && sleep "$left"
+# The slot may sit across a work-hours edge, so report in_hours as of now; keep the
+# pre-sleep value when the re-read fails.
+now=$("${A[@]}" schedule show --json 2>/dev/null | jq -r '.computed.in_hours' 2>/dev/null)
+[[ $now == true || $now == false ]] && in_hours=$now
 echo "TICK $next (in_hours=$in_hours)"
