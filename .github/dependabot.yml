@@ -16,12 +16,6 @@ updates:
       # when both move to a newer Node line.
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
-      # tsc 7 type-checks this repo cleanly, but TypeScript 7 drops the JS
-      # compiler API that scripts/lib/wrangler-config.mjs (readJsonc, used by
-      # the deploy action) calls. Revisit once readJsonc uses a JSONC parser
-      # of its own. This also skips TypeScript 6.
-      - dependency-name: typescript
-        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
