@@ -3,7 +3,7 @@
 
 import { DEFAULT_FLEET, FLEET_ID_RE } from "../shared/types.ts";
 import { fleetScope, requireFleet, type Caller } from "./auth.ts";
-import { badRequest, HttpError, notFound } from "./http.ts";
+import { badRequest, conflict, HttpError, notFound } from "./http.ts";
 import type { Ctx } from "./router.ts";
 import { getDoc, type DeletePin } from "./store.ts";
 
@@ -69,7 +69,12 @@ export async function deleteInFleet(
       const cur = await getDoc(c.env.DB, collection, id);
       if (!cur) throw notFound(`No ${what.toLowerCase()} ${id}`);
       requireFleet(c.caller, cur.data, what);
-      pin = { version: asked ?? cur.version, createdAt: cur.created_at };
+      // Always the version it checked: a pin on another one (a later version, which a move may be about to
+      // write) is a 409 here, with the doc it checked.
+      if (asked !== undefined && asked !== cur.version) {
+        throw conflict("conflict", `Version mismatch: have ${cur.version}, if_version ${asked}`, cur);
+      }
+      pin = { version: cur.version, createdAt: cur.created_at };
     }
     try {
       if ((await del(pin)) === "missing") throw notFound(`No ${what.toLowerCase()} ${id}`);

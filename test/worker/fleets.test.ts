@@ -90,7 +90,11 @@ describe("a token's writes stay in its fleet", () => {
     expect((await B.post(`/api/items/${id}/claim`, {})).status).toBe(403);
     expect((await A.post(`/api/items/${id}/claim`, {})).body.data.status).toBe("processing");
     expect((await B.del(`/api/items/${id}`)).status).toBe(403);
-    expect((await A.del(`/api/items/${id}`)).status).toBe(200);
+    // A pin on any version but the one it checked is a 409 (with its own doc), never a delete on that version.
+    const v = (await human.get(`/api/items/${id}`)).body.version;
+    const ahead = await A.del(`/api/items/${id}?if_version=${v + 1}`);
+    expect([ahead.status, ahead.body.current?.version]).toEqual([409, v]);
+    expect((await A.del(`/api/items/${id}?if_version=${v}`)).status).toBe(200);
   });
 });
 

@@ -30,7 +30,6 @@ import { fleetScope, orchestratorScope, requireAdmin, requireHuman, requireRole,
 import { badRequest, conflict, forbidden, json, notFound, readJson } from "../http.ts";
 import {
   bodySha,
-  getRun,
   HEAD_COLS,
   PR_COLS,
   RUN_COLS,
@@ -93,6 +92,15 @@ const fleetGuard = (db: D1Database, routine: string, fleet: string | null) =>
     )
     .bind(routine, fleet);
 
+// A run as stored, read with its routine's fleet and checked against the caller's (the routine may have been
+// deleted and created again by another fleet since the caller's own write). Null when there is none.
+async function runInFleet(c: Ctx, routine: string, stamp: string): Promise<RunRow | null> {
+  const db = c.env.DB;
+  const [fleet, run] = await db.batch<any>([routineFleetSql(db, routine), db.prepare(`SELECT ${RUN_COLS} FROM review_runs WHERE routine = ? AND stamp = ?`).bind(routine, stamp)]);
+  checkRoutineFleet(c.caller, fleet.results[0]);
+  return (run.results[0] as RunRow | undefined) ?? null;
+}
+
 // A write's statements behind fleetGuard, their results without its. When the batch fails, the routine's fleet
 // says whether the guard tripped (403) or something else did (rethrown).
 async function guardedBatch<T>(c: Ctx, routine: string, stmts: D1PreparedStatement[]): Promise<D1Result<T>[]> {
@@ -117,7 +125,7 @@ async function start(c: Ctx): Promise<Response> {
   const row = results[results.length - 1].results[0];
   if (row) return json(toRun(row), 201);
   // Already there (a retried start, or one that arrived after its report): as stored, nothing written.
-  const cur = await getRun(db, routine, stamp);
+  const cur = await runInFleet(c, routine, stamp);
   if (!cur) throw new Error(`start of ${routine}/${stamp} wrote nothing and found no run`);
   return json(toRun(cur));
 }
@@ -138,7 +146,7 @@ async function report(c: Ctx): Promise<Response> {
     return json({ run: toRun(row), prs_written: n(1), events_written: n(3), gone: n(2) } satisfies ReviewReportResponse, 201);
   }
   // The run was already finished, so no statement wrote anything: a replay of the same body, or a conflict.
-  const cur = await getRun(db, routine, payload.stamp);
+  const cur = await runInFleet(c, routine, payload.stamp);
   if (!cur) throw new Error(`report of ${routine}/${payload.stamp} wrote nothing and found no run`);
   if (cur.report_sha === sha) {
     return json({ run: toRun(cur), prs_written: 0, events_written: 0, gone: 0, replayed: true } satisfies ReviewReportResponse);
@@ -260,9 +268,7 @@ async function runView(c: Ctx): Promise<Response> {
   requireReader(c.caller, routine);
   if (!STAMP_RE.test(stamp)) throw badRequest('The stamp must look like "2026-10-08T180000Z"');
   const db = c.env.DB;
-  const [fleet, run] = await db.batch<any>([routineFleetSql(db, routine), db.prepare(`SELECT ${RUN_COLS} FROM review_runs WHERE routine = ? AND stamp = ?`).bind(routine, stamp)]);
-  checkRoutineFleet(c.caller, fleet.results[0]);
-  const row = run.results[0] as RunRow | undefined;
+  const row = await runInFleet(c, routine, stamp);
   if (!row) throw notFound(`No run ${routine}/${stamp}`);
   return json(toRun(row));
 }

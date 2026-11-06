@@ -370,7 +370,7 @@ describe("D1 statements per report", () => {
     expect(big.filter((s) => s.startsWith("batch:"))).toHaveLength(6);
   });
 
-  it("a replay adds one read to tell a replay from a conflict, and nothing else", async () => {
+  it("a replay adds one read (the run, with its routine's fleet) to tell a replay from a conflict, and nothing else", async () => {
     const r = await routine();
     const body = { stamp: stamp(0), result: "ok", report: sampleReport(45) };
     await r.report(body as never);
@@ -388,7 +388,7 @@ describe("D1 statements per report", () => {
     );
     await waitOnExecutionContext(ctx);
     expect(res.status).toBe(200);
-    expect(ran).toHaveLength(8);
+    expect(ran).toHaveLength(9);
   });
 });
 
