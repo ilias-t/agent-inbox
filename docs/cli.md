@@ -57,6 +57,7 @@ Name manager tokens `orch-<ID>` so `agent-inbox wait --actor token:orch-` can pi
 | `withdraw <id> --if-version N [--note text]` | Take back an `open` item whose question no longer applies: it is archived with `decision.choice: "withdrawn"` and the note as the reason (History shows "Withdrawn"). `--if-version` is the version you read as open (required). A manager token withdraws only its own item posted with `--source <its id>` (403 otherwise); the orchestrator and admins any open item. Exit 3 when the item changed or is no longer open, e.g. the human decided it first (`conflict` / `not_open`, `current` on stderr): read `current` and act on the decision ([api.md](api.md) "Withdrawing your own item") |
 | `answer <id> <text\|-> [--if-version N] [--set k=v…] [--file data.json]` | Answer qa; clears `qa_pending` and applies `--set` / `--file` to the item in the same write |
 | `orch list`, `orch show <id>`, `orch set <id> --file\|--set…\|--unset k… [--if-version N]`, `orch delete <id> [--if-version N]` | Manager docs (`--file` = PUT, `--set`/`--unset` alone = PATCH, created if missing) |
+| `orch relink (<id> [--session-id <uuid>] \| --all) [--seed]` | Point a manager doc's `session_url` at its running Claude Code session (`--all`: every manager that isn't done). A manager whose session isn't running keeps its link and gets `session_live: false`. `--session-id` records the Claude session uuid on the doc first; `--seed` fills a missing `session_id` from the transcripts. It reads this machine's Claude Code files ("Session files" below); recipe in [orchestrator.md](orchestrator.md) |
 | `meta get <id>`, `meta set <id> --file\|--set…\|--unset k… [--if-version N]`, `tick-request [--note]` | Meta docs (`manager`, `lease`, `schedule`; `set` like `orch set`) and the Run tick now request |
 | `batch --file ops.json\|-` | Several writes in one transaction, all or none: `{"ops": [...]}` or a bare array, ops as in [api.md](api.md) "Batch" (`{"op": "item.claim", "id": "x", "if_version": 4}`). Prints one line per op; exit 3 on any 409 (a failed pin, `not_decided`), with the failing op's `index` in the stderr JSON |
 | `digest [<markdown\|->] [--sweep] [--next-tick ISO\|+10m] [--if-version N]` | Stamps `meta/manager.last_pickup` (and `last_tick` with `--sweep`) and `next_tick` (default: the schedule's next pickup); writes the digest only when given |
@@ -75,6 +76,17 @@ Name manager tokens `orch-<ID>` so `agent-inbox wait --actor token:orch-` can pi
 `--set key=value` is a string, `key:=<json>` is typed (`qa_pending:=false`). A trailing `<text>` may be unquoted words; `-` reads stdin.
 
 `me` in `--assignee`/`--assign` is the caller's email from `/api/me`, so it needs a human principal (local dev without a token); with a token it's a usage error (exit 2). Listings show an assigned item as `[@<email>]`, and `show` prints `Assignee:`; items without one print as before.
+
+## Session files
+
+`orch relink` runs on the machine where the managers' Claude Code sessions run. It finds each running session in Claude Code's `<pid>.json` session files and, for `--seed`, searches the `<sessionId>.jsonl` transcripts. Two variables replace the default locations; each takes a `:`-separated list of directories, and a set variable replaces the default rather than adding to it:
+
+| Variable | Default | Holds |
+|---|---|---|
+| `AGENT_INBOX_SESSION_DIRS` | `~/.claude/sessions` | `<pid>.json` for each running session (its `sessionId` and Remote Control `bridgeSessionId`) |
+| `AGENT_INBOX_PROJECT_DIRS` | `~/.claude/projects` | `<cwd-slug>/<sessionId>.jsonl` transcripts |
+
+Sessions started with another `CLAUDE_CONFIG_DIR` (a second account, say) keep their files under that directory, so list every one in use: `AGENT_INBOX_SESSION_DIRS=$HOME/.claude/sessions:$HOME/.claude-work/sessions`.
 
 ## Exit codes
 

@@ -9,12 +9,13 @@ import { join } from "node:path";
 const URL_BASE = "https://claude.ai/code/cse_";
 const DONE = new Set(["done", "dropped", "cleaned"]);
 
-// Claude Code's session dirs for each account (personal, team); AGENT_INBOX_SESSION_DIRS overrides (":"-separated).
+// Where Claude Code writes its <pid>.json session files. AGENT_INBOX_SESSION_DIRS (":"-separated) replaces the
+// default, e.g. to also cover sessions started with another CLAUDE_CONFIG_DIR.
 export function sessionDirs(env, home = homedir()) {
   const o = env.AGENT_INBOX_SESSION_DIRS;
-  return o ? o.split(":").filter(Boolean) : [join(home, ".claude", "sessions"), join(home, ".claude-team", "sessions")];
+  return o ? o.split(":").filter(Boolean) : [join(home, ".claude", "sessions")];
 }
-// Transcripts live under projects/<cwd-slug>/<sessionId>.jsonl; the team account shares ~/.claude/projects.
+// Transcripts live under projects/<cwd-slug>/<sessionId>.jsonl; AGENT_INBOX_PROJECT_DIRS replaces the default the same way.
 export function projectDirs(env, home = homedir()) {
   const o = env.AGENT_INBOX_PROJECT_DIRS;
   return o ? o.split(":").filter(Boolean) : [join(home, ".claude", "projects")];
