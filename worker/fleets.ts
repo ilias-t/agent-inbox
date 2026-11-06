@@ -125,10 +125,16 @@ export type MetaBase = "manager" | "lease" | "schedule";
 export const metaId = (base: MetaBase, fleet: string | null) => (fleet === null ? base : `${base}:${fleet}`);
 
 // The fleet a lease, schedule or tick-request call acts on: a token's own (one that names another fleet is 403),
-// or the one a person names (`asked`: a `?fleet=` or body value, `default` or a fleet id), else the default fleet.
-export function targetFleet(c: Caller, asked: unknown): string | null {
-  const named = asked === undefined || asked === null ? undefined : parseFleet(asked);
-  const own = fleetScope(c);
+// or the one a person names, else the default fleet. A fleet may be named in `?fleet=` or in the body's `fleet`
+// (`default` or a fleet id); naming two different ones is 400, so a fleet put in the other place is never
+// silently the default fleet's.
+export function targetFleet(c: Ctx, body?: Record<string, unknown>): string | null {
+  const fromQuery = c.url.searchParams.get("fleet");
+  const q = fromQuery === null ? undefined : parseFleet(fromQuery);
+  const b = body?.fleet === undefined || body.fleet === null ? undefined : parseFleet(body.fleet);
+  if (q !== undefined && b !== undefined && q !== b) throw badRequest("?fleet= and the body's fleet name different fleets");
+  const named = q !== undefined ? q : b;
+  const own = fleetScope(c.caller);
   if (own === undefined) return named ?? null;
   if (named !== undefined && named !== own) throw forbidden("That is another fleet's");
   return own;

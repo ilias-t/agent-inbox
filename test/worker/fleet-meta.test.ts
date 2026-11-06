@@ -268,3 +268,61 @@ describe("a named fleet's manager token", () => {
     await step(() => A.put("/api/meta/manager", { data: { note: uid() } }));
   });
 });
+
+describe("naming the fleet", () => {
+  it("takes a person's fleet from ?fleet= or the body, and refuses two different ones", async () => {
+    const shared = (await human.get("/api/schedule")).body.schedule;
+    const put = await human.put("/api/schedule", { schedule: { ...shared, pickup_interval_min: 12 }, fleet: "fb" });
+    expect(put.status).toBe(200);
+    expect((await B.get("/api/schedule")).body.schedule.pickup_interval_min).toBe(12);
+    expect((await human.get("/api/schedule")).body.schedule.pickup_interval_min).toBe(shared.pickup_interval_min);
+    expect((await human.put("/api/schedule?fleet=fa", { schedule: shared, fleet: "fb" })).status).toBe(400);
+    expect((await human.del("/api/schedule?fleet=fb")).status).toBe(200);
+    const tick = await call("POST", "/api/meta/manager/tick-request?fleet=fb", { body: {} });
+    expect(tick.body.id).toBe("manager:fb");
+    const acq = await human.post("/api/lease/acquire", { session_id: uid("body-fleet"), fleet: "fb", force: true, if_version: (await B.get("/api/lease")).body.lease?.version ?? 0 });
+    expect(acq.body.lease.id).toBe("lease:fb");
+    // A decider's tick request names a fleet too.
+    await setRoles({ "decider@team.test": "decider" });
+    expect((await person("decider@team.test").post("/api/meta/manager/tick-request", { fleet: "fa" })).body.id).toBe("manager:fa");
+  });
+
+  it("a pinned drop of hours that are already gone is 409", async () => {
+    const shared = (await human.get("/api/schedule")).body.schedule;
+    const v = (await A.put("/api/schedule", { schedule: shared })).body.version;
+    expect((await A.del(`/api/schedule?if_version=${v}`)).status).toBe(200);
+    const again = await A.del(`/api/schedule?if_version=${v}`);
+    expect([again.status, again.body.current]).toEqual([409, null]);
+  });
+});
+
+describe("a named fleet's token through /api/meta, by the bare ids", () => {
+  it("reads and writes its own manager, schedule and lease docs", async () => {
+    await A.del("/api/schedule");
+    expect((await A.get("/api/meta/schedule")).status).toBe(404); // inherits: no doc of its own
+    expect((await A.patch("/api/meta/schedule", { data: { pickup_interval_min: 10 } })).status).toBe(404);
+    const shared = (await human.get("/api/schedule")).body.schedule;
+    const put = await A.put("/api/meta/schedule", { data: { ...shared, pickup_interval_min: 10 } });
+    expect([put.status, put.body.id]).toEqual([201, "schedule:fa"]);
+    expect((await A.put("/api/meta/schedule", { data: { ...shared, pickup_interval_min: 7 } })).status).toBe(400);
+    expect((await A.get("/api/schedule")).body.schedule.pickup_interval_min).toBe(10);
+    await A.del("/api/schedule");
+    await A.post("/api/lease/acquire", { session_id: uid("bare"), force: true, if_version: (await A.get("/api/lease")).body.lease?.version ?? 0 });
+    expect((await A.get("/api/meta/lease")).body.id).toBe("lease:fa");
+    expect((await A.put("/api/meta/lease", { data: {} })).status).toBe(400);
+  });
+});
+
+describe("the default fleet's lease and status in other fleets' feeds", () => {
+  it("never reach a named fleet's feed, nor a person's ?fleet= view of one", async () => {
+    const c0 = await cursorNow();
+    const v = (await D.get("/api/lease")).body.lease?.version ?? 0;
+    const s = uid("dl");
+    await D.post("/api/lease/acquire", { session_id: s, force: true, if_version: v });
+    await D.post("/api/lease/renew", { session_id: s });
+    await D.post("/api/meta/manager/tick-request", {});
+    expect((await A.get(`/api/changes?since=${c0}`)).body.changes).toEqual([]);
+    expect((await human.get(`/api/changes?since=${c0}&fleet=fa`)).body.changes).toEqual([]);
+    expect((await D.get(`/api/changes?since=${c0}`)).body.changes.map((r: any) => r.doc_id)).toEqual(["lease", "lease", "manager"]);
+  });
+});

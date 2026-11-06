@@ -64,7 +64,7 @@ async function tickRequest(c: Ctx): Promise<Response> {
   const { doc } = await mutate<ManagerMeta>(
     c.env.DB,
     "meta",
-    metaId("manager", targetFleet(c.caller, body.fleet)),
+    metaId("manager", targetFleet(c, body)),
     { actor: c.caller.actor, now: c.now },
     (cur) => ({ ...(cur?.data ?? {}), tick_requested_at: c.now, tick_requested_note: note || null }),
   );

@@ -6,7 +6,7 @@ import { computeSchedule, validateSchedule } from "../../shared/schedule.ts";
 import { DEFAULT_SCHEDULE, type Doc, type Schedule, type ScheduleView } from "../../shared/types.ts";
 import { requireFullAdmin } from "../auth.ts";
 import { metaId, targetFleet } from "../fleets.ts";
-import { badRequest, ifVersion, json } from "../http.ts";
+import { badRequest, conflict, ifVersion, json } from "../http.ts";
 import type { Ctx, Route } from "../router.ts";
 import { COLS, deleteDoc, mutate, toDoc, type DocRow } from "../store.ts";
 
@@ -25,6 +25,8 @@ export function scheduleView(doc: Doc<Schedule> | null, now = new Date()): Sched
 // read-merge-write pins on the doc it writes, and `inherited_version`, the deployment's doc's, so a client sees
 // those hours change. A deployment schedule that doesn't validate isn't flagged here: the fleet has nothing
 // stored that a write would replace. The default fleet's own doc is the deployment's.
+// A fleet's own doc that doesn't validate gives the built-in defaults (flagged stored_invalid), not the
+// deployment's hours: what it stored is its choice, and a client must see it is broken rather than fixed for it.
 export function fleetScheduleView(fleet: string | null, own: Doc<Schedule> | null, shared: Doc<Schedule> | null, now = new Date()): ScheduleView {
   if (fleet === null) return scheduleView(shared, now);
   if (own) return scheduleView(own, now);
@@ -45,8 +47,9 @@ export async function fleetSchedule(db: D1Database, fleet: string | null): Promi
   return fleetScheduleView(fleet, fleet === null ? null : doc(metaId("schedule", fleet)), doc("schedule"));
 }
 
-// The fleet a schedule call is for: a token's own, or a person's ?fleet= (the default fleet without one).
-const scheduleFleet = (c: Ctx) => targetFleet(c.caller, c.url.searchParams.get("fleet") ?? undefined);
+// The fleet a schedule call is for: a token's own, or the one a person names (?fleet= or the body's fleet; the
+// default fleet without one).
+const scheduleFleet = (c: Ctx, body?: Record<string, unknown>) => targetFleet(c, body);
 
 // Validated schedule data or a 400.
 export function checkSchedule(input: unknown): Schedule {
@@ -61,8 +64,8 @@ async function get(c: Ctx): Promise<Response> {
 
 async function put(c: Ctx): Promise<Response> {
   requireFullAdmin(c.caller);
-  const fleet = scheduleFleet(c); // before the body: another fleet's is 403 whatever it says
   const body = await c.body();
+  const fleet = scheduleFleet(c, body); // before the schedule: another fleet's is 403 whatever it says
   const schedule = checkSchedule(body.schedule);
   const { doc } = await mutate<Schedule>(
     c.env.DB,
@@ -80,7 +83,10 @@ async function del(c: Ctx): Promise<Response> {
   requireFullAdmin(c.caller);
   const fleet = scheduleFleet(c);
   if (fleet === null) throw badRequest("The default fleet's schedule is the deployment's: replace it with PUT, it can't be removed");
-  await deleteDoc(c.env.DB, "meta", metaId("schedule", fleet), { version: ifVersion(c.url.searchParams.get("if_version")) });
+  const pin = ifVersion(c.url.searchParams.get("if_version"));
+  const r = await deleteDoc(c.env.DB, "meta", metaId("schedule", fleet), { version: pin });
+  // Nothing to drop is fine, unless the caller pinned a version it read: then that doc is gone already.
+  if (r === "missing" && pin) throw conflict("conflict", `No meta/${metaId("schedule", fleet)} at version ${pin}: it was dropped already`, null);
   return json(await fleetSchedule(c.env.DB, fleet));
 }
 
