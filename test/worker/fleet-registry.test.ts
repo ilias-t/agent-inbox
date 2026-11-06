@@ -35,6 +35,10 @@ describe("reading the registry", () => {
     expect((await D.get("/api/fleets/fa")).status).toBe(403);
     expect((await M.get("/api/fleets")).status).toBe(403);
     expect((await M.get("/api/fleets/fa")).status).toBe(403);
+    // 403 before the id is parsed: a token's malformed id is no different from another fleet's.
+    expect((await M.get("/api/fleets/Not.A.Fleet")).status).toBe(403);
+    expect((await A.get("/api/fleets/Not.A.Fleet")).status).toBe(403);
+    expect((await A.patch("/api/fleets/Not.A.Fleet", { data: {} })).status).toBe(403);
     expect((await human.get("/api/fleets/nope")).status).toBe(404);
     expect((await human.get("/api/fleets/Not.A.Fleet")).status).toBe(400);
   });

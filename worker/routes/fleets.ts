@@ -22,12 +22,13 @@ function fleetId(raw: string): string {
   return parseFleet(raw, "A fleet's id") ?? DEFAULT_FLEET;
 }
 
-// A token reaches only its own fleet's doc (403 before anything is read, so a 404 says nothing about another
-// fleet); a manager token none, as with the manager list.
-function requireOwnFleet(c: Caller, id: string): void {
+// A token reaches only its own fleet's doc (403 before the id is even parsed or anything read, so neither a 400 nor
+// a 404 says anything about another fleet); a manager token none, as with the manager list. The parsed id.
+function ownFleetId(c: Caller, raw: string): string {
   requireFull(c);
   const own = fleetScope(c);
-  if (own !== undefined && id !== (own ?? DEFAULT_FLEET)) throw forbidden("That is another fleet's");
+  if (own !== undefined && raw !== (own ?? DEFAULT_FLEET)) throw forbidden("That is another fleet's");
+  return fleetId(raw);
 }
 
 // The stored form of a fleet doc: only the known fields, each checked; a null (or, on a replace, a missing field)
@@ -72,8 +73,7 @@ async function list(c: Ctx): Promise<Response> {
 }
 
 async function get(c: Ctx): Promise<Response> {
-  const id = fleetId(c.params.id);
-  requireOwnFleet(c.caller, id);
+  const id = ownFleetId(c.caller, c.params.id);
   const doc = await getDoc<Fleet>(c.env.DB, FLEETS, id);
   if (!doc) throw notFound(`No fleet ${id}`);
   return json(doc);
@@ -81,8 +81,7 @@ async function get(c: Ctx): Promise<Response> {
 
 // An admin creates or replaces it; an orchestrator token only creates its own fleet's.
 function putFleetOp(c: Ctx, raw: string, body: Record<string, unknown>): WriteOp<Fleet> {
-  const id = fleetId(raw);
-  requireOwnFleet(c.caller, id);
+  const id = ownFleetId(c.caller, raw);
   requireRole(c.caller, "admin");
   const scoped = fleetScope(c.caller) !== undefined;
   const data = validateFleet(bodyData(body));
@@ -100,9 +99,9 @@ function putFleetOp(c: Ctx, raw: string, body: Record<string, unknown>): WriteOp
 }
 
 function patchFleetOp(c: Ctx, raw: string, body: Record<string, unknown>): WriteOp<Fleet> {
-  const id = fleetId(raw);
   requireRole(c.caller, "admin");
   if (c.caller.principal.kind !== "human") throw forbidden("Only admins change a fleet");
+  const id = fleetId(raw);
   const patch = bodyData(body);
   validateFleet(patch); // the field names and values, before anything is read
   return {
