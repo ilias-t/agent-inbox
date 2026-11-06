@@ -95,7 +95,8 @@ export async function deleteInFleet(
 export const fleetChangesSql = (named: boolean, p: string) => (named ? `(fleet = ${p} OR (${SHARED_CHANGES}))` : "fleet IS NULL");
 
 // The deployment-wide change rows: the condition of migration 0012's partial index changes_shared, word for word
-// (so a query that names it can read just those rows), less the default fleet's own manager and lease.
+// (so a query that names it can read that index), less the default fleet's own manager and lease, which the index
+// still holds and the query drops.
 export const SHARED_CHANGES =
   "fleet IS NULL AND collection IN ('users', 'meta', 'snoozes', 'pins') AND NOT (collection = 'meta' AND doc_id IN ('manager', 'lease'))";
 
@@ -112,6 +113,7 @@ export function metaFleet(id: string): { base: string; fleet: string | null } | 
 export function requireMetaFleet(c: Caller, id: string): void {
   const own = fleetScope(c), named = metaFleet(id);
   if (named && named.fleet === null) throw badRequest(`The default fleet's is meta/${named.base}`);
+  if (named) parseFleet(named.fleet, `The fleet in meta/${id}`);
   if (own !== undefined && named && named.fleet !== own) throw forbidden(`meta/${id} belongs to another fleet`);
 }
 

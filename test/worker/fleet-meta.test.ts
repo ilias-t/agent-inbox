@@ -3,8 +3,9 @@
 // default fleet keeps meta/lease, meta/manager and meta/schedule.
 import { env } from "cloudflare:workers";
 import { beforeAll, describe, expect, it } from "vitest";
-import { LEASE_SESSION_HEADER } from "../../shared/types.ts";
-import { agent, call, human, mintFleetToken, setRoles, uid } from "./helpers.ts";
+import { LEASE_SESSION_HEADER, type StateResponse } from "../../shared/types.ts";
+import { applyDelta, normalize } from "./delta-merge.ts";
+import { agent, call, human, mintFleetToken, person, setRoles, uid } from "./helpers.ts";
 
 type Client = ReturnType<typeof agent>;
 let A: Client, B: Client, D: Client; // orchestrator tokens of fleets fa and fb, and of the default fleet
@@ -167,5 +168,103 @@ describe("work hours", () => {
     expect((await A.get("/api/schedule?fleet=fb")).status).toBe(403);
     expect((await human.del("/api/schedule?fleet=fb")).body.inherited).toBe(true);
     expect(await metaIds()).not.toContain("schedule:fb");
+  });
+});
+
+describe("a named fleet's lease in claims, batches and renewals", () => {
+  const withSession = (session: string) => ({ token: aSecret, host: "inbox.test", headers: { [LEASE_SESSION_HEADER]: session } });
+  const takeA = async (session: string) => {
+    const v = (await A.get("/api/lease")).body.lease?.version ?? 0;
+    expect((await A.post("/api/lease/acquire", { session_id: session, force: true, if_version: v })).status).toBe(200);
+  };
+
+  it("lets the session holding the fleet's lease re-take an item another session left processing", async () => {
+    const id = uid("retake");
+    await A.put(`/api/items/${id}`, { data: { type: "decision", title: "r" } });
+    await human.post(`/api/items/${id}/decide`, { choice: "ack" });
+    await takeA("fa-s1");
+    const first = await call("POST", `/agent/api/items/${id}/claim`, { ...withSession("fa-s1"), body: {} });
+    expect([first.status, first.body.data.claimed_by]).toEqual([200, "fa-s1"]);
+    await takeA("fa-s2");
+    const again = await call("POST", `/agent/api/items/${id}/claim`, { ...withSession("fa-s2"), body: {} });
+    expect([again.status, again.body.data.claimed_by, again.body.data.reclaimed_from]).toEqual([200, "fa-s2", "fa-s1"]);
+    // The old session lost fa's lease: its write is refused with fa's lease as current.
+    const stale = await call("POST", `/agent/api/items/${id}/claim`, { ...withSession("fa-s1"), body: {} });
+    expect([stale.status, stale.body.current?.id]).toEqual([409, "lease:fa"]);
+  });
+
+  it("checks a batch's X-Lease-Session against the fleet's lease", async () => {
+    await takeA("fa-batch");
+    const ops = { ops: [{ op: "item.put", id: uid("fa-b"), data: { type: "info", title: "b" } }] };
+    expect((await call("POST", "/agent/api/batch", { ...withSession("fa-batch"), body: ops })).status).toBe(200);
+    await B.post("/api/lease/acquire", { session_id: "fb-batch", force: true, if_version: (await B.get("/api/lease")).body.lease?.version ?? 0 });
+    const r = await call("POST", "/agent/api/batch", { ...withSession("fb-batch"), body: { ops: [{ op: "item.put", id: uid("fa-b"), data: { type: "info", title: "b" } }] } });
+    expect([r.status, r.body.current?.id]).toEqual([409, "lease:fa"]);
+  });
+
+  it("renews for the fleet's own hours' TTL", async () => {
+    const sched = (await human.get("/api/schedule")).body.schedule;
+    await A.put("/api/schedule", { schedule: { ...sched, pickup_interval_min: 60, sweep_interval_min: 60 } });
+    await takeA("fa-renew");
+    const r = await A.post("/api/lease/renew", { session_id: "fa-renew" });
+    expect((Date.parse(r.body.lease.data.expires_at) - Date.parse(r.body.lease.data.heartbeat_at)) / 60_000).toBe(75);
+    await A.del("/api/schedule");
+  });
+});
+
+describe("default and invalid fleet names", () => {
+  it("?fleet=default and fleet: default are the default fleet's; a meta id must name a fleet id", async () => {
+    expect((await human.post("/api/meta/manager/tick-request", { fleet: "default" })).body.id).toBe("manager");
+    const d = await human.post("/api/lease/acquire?fleet=default", { session_id: uid("def"), force: true, if_version: (await human.get("/api/lease")).body.lease?.version ?? 0 });
+    expect(d.body.lease.id).toBe("lease");
+    expect((await human.put("/api/meta/schedule:Bad_Fleet", { data: {} })).status).toBe(400);
+    expect((await human.put("/api/meta/manager:Bad_Fleet", { data: {} })).status).toBe(400);
+    expect((await A.post("/api/lease/release?fleet=fb", {})).status).toBe(403); // the fleet before the body
+    expect((await A.put("/api/schedule?fleet=fb", {})).status).toBe(403);
+  });
+});
+
+describe("dropping a fleet's own hours", () => {
+  it("is pinned with if_version, idempotent, and an admin's or the fleet orchestrator's only", async () => {
+    const sched = (await human.get("/api/schedule")).body.schedule;
+    const put = await A.put("/api/schedule", { schedule: { ...sched, pickup_interval_min: 20 } });
+    expect((await A.del(`/api/schedule?if_version=${put.body.version + 1}`)).status).toBe(409);
+    await setRoles({ "viewer@team.test": "viewer" });
+    expect((await person("viewer@team.test").del("/api/schedule?fleet=fa")).status).toBe(403);
+    const mgr = agent((await mintFleetToken("fa", "orchestrator", uid("I"))).secret);
+    expect((await mgr.del("/api/schedule")).status).toBe(403);
+    expect((await A.del(`/api/schedule?if_version=${put.body.version}`)).body.inherited).toBe(true);
+    expect((await A.del("/api/schedule")).status).toBe(200);
+  });
+
+  it("says when the inherited hours change (inherited_version)", async () => {
+    const before = (await A.get("/api/schedule")).body;
+    const shared = (await human.get("/api/schedule")).body;
+    expect(before.inherited_version).toBe(shared.version);
+    const next = { ...shared.schedule, sweep_interval_min: shared.schedule.sweep_interval_min === 40 ? 41 : 40 };
+    const r = await human.put("/api/schedule", { schedule: next });
+    expect((await A.get("/api/schedule")).body).toMatchObject({ version: null, inherited: true, inherited_version: r.body.version });
+  });
+});
+
+describe("a named fleet's manager token", () => {
+  it("follows its fleet's hours in /api/state and the delta: own, dropped, and the deployment's", async () => {
+    const mgr = agent((await mintFleetToken("fa", "orchestrator", uid("I"))).secret);
+    let held = (await mgr.get("/api/state")).body as StateResponse;
+    const step = async (write: () => Promise<unknown>) => {
+      await write();
+      const d = (await mgr.get(`/api/state/delta?since=${held.cursor}`)).body;
+      expect(d).not.toHaveProperty("manager");
+      expect(d).not.toHaveProperty("lease");
+      held = applyDelta(held, d);
+      expect(normalize(held)).toEqual(normalize((await mgr.get("/api/state")).body));
+    };
+    const shared = (await human.get("/api/schedule")).body.schedule;
+    await step(() => A.put("/api/schedule", { schedule: { ...shared, pickup_interval_min: 15 } }));
+    expect(held.schedule.schedule.pickup_interval_min).toBe(15);
+    await step(() => A.del("/api/schedule"));
+    expect(held.schedule.inherited).toBe(true);
+    await step(() => human.put("/api/schedule", { schedule: { ...shared, sweep_interval_min: shared.sweep_interval_min === 44 ? 46 : 44 } }));
+    await step(() => A.put("/api/meta/manager", { data: { note: uid() } }));
   });
 });

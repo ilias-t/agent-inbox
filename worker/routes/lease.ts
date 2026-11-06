@@ -86,11 +86,11 @@ async function get(c: Ctx): Promise<Response> {
 
 async function acquire(c: Ctx): Promise<Response> {
   requireFullRole(c.caller, "admin"); // humans: admins only
+  const fleet = leaseFleet(c); // before the body: another fleet's is 403 whatever it says
   const body = await c.body();
   const sessionId = reqString(body, "session_id", 200);
   const title = optString(body, "title", 500);
   const url = optString(body, "url", 2000);
-  const fleet = leaseFleet(c);
   const ttl = await ttlMin(c, body, fleet);
   const pin = ifVersion(body.if_version);
   const force = body.force === true;
@@ -119,9 +119,9 @@ async function acquire(c: Ctx): Promise<Response> {
 
 async function renew(c: Ctx): Promise<Response> {
   requireFullRole(c.caller, "admin"); // humans: admins only
+  const fleet = leaseFleet(c);
   const body = await c.body();
   const sessionId = reqString(body, "session_id", 200);
-  const fleet = leaseFleet(c);
   const ttl = await ttlMin(c, body, fleet);
   const pin = ifVersion(body.if_version);
   const { doc } = await mutate<Lease>(c.env.DB, "meta", metaId("lease", fleet), { actor: c.caller.actor, now: c.now }, (cur) => {
@@ -141,8 +141,8 @@ async function renew(c: Ctx): Promise<Response> {
 
 async function release(c: Ctx): Promise<Response> {
   requireFullRole(c.caller, "admin"); // humans: admins only
-  const sessionId = reqString(await c.body(), "session_id", 200);
   const id = metaId("lease", leaseFleet(c));
+  const sessionId = reqString(await c.body(), "session_id", 200);
   // One statement: delete only while this session holds it.
   const row = await c.env.DB.prepare(
     `DELETE FROM docs WHERE collection = 'meta' AND id = ?

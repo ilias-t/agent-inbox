@@ -21,12 +21,15 @@ export function scheduleView(doc: Doc<Schedule> | null, now = new Date()): Sched
 }
 
 // A fleet's schedule view from its own doc and the deployment's (either may be null): its own when it has one;
-// else the deployment's hours, with `inherited: true` and the version of the fleet's own doc (null: none yet),
-// so a read-merge-write pins on the doc it writes. The default fleet's own doc is the deployment's.
+// else the deployment's hours, with `inherited: true`, the version of the fleet's own doc (null: none yet), so a
+// read-merge-write pins on the doc it writes, and `inherited_version`, the deployment's doc's, so a client sees
+// those hours change. A deployment schedule that doesn't validate isn't flagged here: the fleet has nothing
+// stored that a write would replace. The default fleet's own doc is the deployment's.
 export function fleetScheduleView(fleet: string | null, own: Doc<Schedule> | null, shared: Doc<Schedule> | null, now = new Date()): ScheduleView {
   if (fleet === null) return scheduleView(shared, now);
   if (own) return scheduleView(own, now);
-  return { ...scheduleView(shared, now), version: null, inherited: true };
+  const { stored_invalid: _, ...view } = scheduleView(shared, now);
+  return { ...view, version: null, inherited: true, inherited_version: shared?.version ?? null };
 }
 
 // Both docs a fleet's schedule may come from, in one read.
@@ -58,12 +61,13 @@ async function get(c: Ctx): Promise<Response> {
 
 async function put(c: Ctx): Promise<Response> {
   requireFullAdmin(c.caller);
+  const fleet = scheduleFleet(c); // before the body: another fleet's is 403 whatever it says
   const body = await c.body();
   const schedule = checkSchedule(body.schedule);
   const { doc } = await mutate<Schedule>(
     c.env.DB,
     "meta",
-    metaId("schedule", scheduleFleet(c)),
+    metaId("schedule", fleet),
     { actor: c.caller.actor, now: c.now, ifVersion: ifVersion(body.if_version) },
     () => schedule,
   );
