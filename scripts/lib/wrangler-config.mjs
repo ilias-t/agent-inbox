@@ -7,11 +7,11 @@ import { readFileSync } from "node:fs";
 import { parse, printParseErrorCode } from "jsonc-parser";
 
 // Parses a JSONC file with jsonc-parser and the options wrangler itself reads
-// its config with (comments and trailing commas allowed). jsonc-parser recovers
-// from errors and returns what it could read, so any error throws here instead,
-// naming the first one's line and column.
+// its config with (comments and trailing commas allowed, a leading BOM
+// dropped). jsonc-parser recovers from errors and returns what it could read,
+// so any error throws here instead, naming the first one's line and column.
 export function readJsonc(path) {
-  const text = readFileSync(path, "utf8");
+  const text = readFileSync(path, "utf8").replace(/^﻿/, "");
   const errors = [];
   const config = parse(text, errors, { allowTrailingComma: true });
   if (errors.length) {
@@ -19,6 +19,7 @@ export function readJsonc(path) {
     const lines = text.slice(0, offset).split("\n");
     throw new Error(`${path}:${lines.length}:${lines.at(-1).length + 1}: ${printParseErrorCode(error)}`);
   }
+  if (!config || typeof config !== "object" || Array.isArray(config)) throw new Error(`${path}: the top level must be an object`);
   return config;
 }
 

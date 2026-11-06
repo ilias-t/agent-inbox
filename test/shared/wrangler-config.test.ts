@@ -25,7 +25,7 @@ describe("readJsonc", () => {
     const dir = mkdtempSync(join(tmpdir(), "ai-jsonc-"));
     try {
       const file = join(dir, "c.jsonc");
-      writeFileSync(file, '// head\n{\n  /* block */ "url": "https://x.test//a/*b*/", // tail\n  "list": [1, 2,],\n}\n');
+      writeFileSync(file, '﻿// head\n{\n  /* block */ "url": "https://x.test//a/*b*/", // tail\n  "list": [1, 2,],\n}\n');
       expect(readJsonc(file)).toEqual({ url: "https://x.test//a/*b*/", list: [1, 2] });
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -42,6 +42,8 @@ describe("readJsonc", () => {
         ['{ "a": 1', ":1:9: CloseBraceExpected"],
         ['{ "a": 1 } }', ":1:12: EndOfFileExpected"],
         ["", ":1:1: ValueExpected"],
+        ["[1, 2]", ": the top level must be an object"],
+        ["null", ": the top level must be an object"],
       ]) {
         writeFileSync(file, text);
         expect(() => readJsonc(file), JSON.stringify(text)).toThrow(`${file}${where}`);
