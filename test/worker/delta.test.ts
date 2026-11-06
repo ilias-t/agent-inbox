@@ -347,7 +347,11 @@ describe("GET /api/state/delta", () => {
   // The property the client relies on: a snapshot with every delta since applied equals a fresh snapshot, for
   // every kind of caller, over a random (seeded) run of writes. Its time is HTTP round trips through workerd and D1
   // (the data stays a handful of docs), so each op is one request and each kind gets a fixed number of turns.
-  it("merged into a /api/state snapshot, equals a fresh /api/state for every caller", async () => {
+  // Each op kind ROUNDS times (creates twice), a delta and a fresh snapshot per pull, and the setup come to about 155
+  // requests in sequence: about 1 s on an idle machine, but past vitest's default 5 s when the machine is busy enough
+  // to slow it fivefold. 30 s is about 30 times the idle time (it took 12 s on a CPU core shared with twelve busy
+  // loops).
+  it("merged into a /api/state snapshot, equals a fresh /api/state for every caller", { timeout: 30_000 }, async () => {
     const R = rng(20261007);
     const O1 = uid("O1"), O2 = uid("O2");
     // O1's token both views (its scoped state and delta) and reports its own routine; O2 writes a second one.
