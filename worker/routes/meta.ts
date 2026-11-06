@@ -20,7 +20,7 @@ const PEOPLE_ONLY = "meta/people was replaced by the users table: use /api/peopl
 // A fleet's meta doc is named in its id (`meta/manager:<fleet>`; a token's bare id is its own fleet's), never by
 // a separate fleet: one there would otherwise be ignored, and the call land on the default fleet's doc.
 function refuseFleetParam(c: Ctx, body?: Record<string, unknown>): void {
-  if (c.url.searchParams.has("fleet") || (body && body.fleet !== undefined)) {
+  if (c.url.searchParams.has("fleet") || (body && body.fleet !== undefined && body.fleet !== null)) {
     throw badRequest("Name a fleet's meta doc in its id (meta/<id>:<fleet>), not with fleet");
   }
 }

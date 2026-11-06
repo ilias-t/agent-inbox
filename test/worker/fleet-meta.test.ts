@@ -356,3 +356,18 @@ describe("where a fleet may be named", () => {
     expect((await mgr.get("/api/schedule")).status).toBe(200);
   });
 });
+
+describe("batch meta ops from a named fleet's token", () => {
+  it("refuse the lease (400) and another fleet's doc (403), naming the op", async () => {
+    const lease = await A.post("/api/batch", { ops: [{ op: "meta.put", id: "lease", data: {} }] });
+    expect([lease.status, lease.body.index]).toEqual([400, 0]);
+    const other = await A.post("/api/batch", {
+      ops: [
+        { op: "meta.patch", id: "manager", data: { note: "mine" } },
+        { op: "meta.put", id: "manager:fb", data: { note: "theirs" } },
+      ],
+    });
+    expect([other.status, other.body.index]).toEqual([403, 1]);
+    expect((await human.patch("/api/meta/manager", { data: { note: "x" }, fleet: null })).status).not.toBe(400);
+  });
+});
