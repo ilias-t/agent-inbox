@@ -71,6 +71,22 @@ Bug reports and feature requests use the forms in the issue chooser. Planned wor
 - **Done when** lists results someone can check, not steps. How to get there belongs in the pull request.
 - Keep it short and stick to what's known. No estimates, no guesses dressed up as facts.
 
+## Releases
+
+A release is a version tag plus its notes. Deploy repos pin a release's commit, and Dependabot proposes the next tag to them ([examples/deploy-repo](examples/deploy-repo/README.md#with-dependabot)), so tags are never moved or deleted once pushed. Versions follow semver. While on `0.x`, a minor release brings features or migrations and a patch release brings fixes only.
+
+To cut `vX.Y.Z` (maintainers):
+
+1. In a pull request, add a `## vX.Y.Z (YYYY-MM-DD)` entry at the top of [CHANGELOG.md](CHANGELOG.md), written from `git log --oneline v<previous>..origin/main`. Keep it to what users notice, and name every new migration, setting, secret or deploy step. Use full `https://github.com/...` links, since the entry also becomes the release page. Set `"version"` in `package.json` with `npm version X.Y.Z --no-git-tag-version`. Merge it.
+2. Tag the merge commit and publish the notes. `gh` creates the tag:
+
+   ```bash
+   awk '/^## vX\.Y\.Z /{f=1; next} /^## /{f=0} f' CHANGELOG.md > notes.md
+   gh release create vX.Y.Z --target <merge commit sha> --title "vX.Y.Z" --notes-file notes.md
+   ```
+
+   For a tag that's already pushed, `gh` ignores `--target`. Pass `--verify-tag` instead, so a mistyped tag fails rather than creating a new one.
+
 ## License of contributions
 
 agent-inbox is source-available under [FSL-1.1-MIT](LICENSE.md): free to use, modify and self-host, including at work, but not to offer as a competing commercial product or service, and each release becomes MIT two years after it's published. By sending a pull request you agree that your contribution is licensed under the same terms. There is no contributor license agreement to sign.
