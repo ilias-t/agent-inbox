@@ -15,7 +15,7 @@ npm run dev           # terminal 2: Vite on :5173, proxying /api, /agent and /ho
 
 Open http://localhost:5173. Vite's proxy expects the Worker on port 8787. If it runs elsewhere (`npm run worker:dev -- --port 8788`), point the proxy at it with `WORKER_DEV_URL=http://localhost:8788 npm run dev`.
 
-Install dependencies with `npm ci`. To add or bump a dependency, use npm 11 (`npx npm@11 install -D <pkg>@<version>`): npm 10, which ships with Node 22, can crash with `Cannot read properties of null (reading 'edgesOut')` when it changes this dependency tree. npm 11 then warns that esbuild's and workerd's install scripts are "not yet covered by allowScripts". You don't need to approve them: with its default settings npm 11 still runs them, and `npm run check` passes even when they're skipped. To get back to exactly the install CI uses, run `npm ci`.
+Install dependencies with `npm ci`. To add or bump a dependency, use npm 11 (`npx npm@11 install -D <pkg>@<version>`): npm 10, which ships with Node 22, can crash with `Cannot read properties of null (reading 'edgesOut')` when it changes this dependency tree. npm 11 then warns that some install scripts (esbuild's and workerd's, and fsevents' on macOS) are "not yet covered by allowScripts"; with its default settings it still runs them, so there is nothing to approve. Afterwards, `npm ci` reinstalls from the lockfile with the command CI uses.
 
 ## Before you send a change
 
