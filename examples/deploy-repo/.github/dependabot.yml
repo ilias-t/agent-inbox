@@ -1,0 +1,10 @@
+# Opens a pull request when agent-inbox publishes a newer version tag (v0.2.0, ...). The PR moves the
+# `uses:` pin in .github/workflows/deploy.yml to that tag's commit and rewrites the `# vX.Y.Z` comment.
+# Merging it is the deploy (every push to main deploys), so don't auto-merge these PRs: read the
+# release notes first. examples/deploy-repo/README.md in agent-inbox explains how it works.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
