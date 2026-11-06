@@ -1,13 +1,13 @@
 // Tests and e2e run from wrangler.test.jsonc; deployments start from wrangler.example.jsonc. The two must be the
 // same app, differing only in the per-instance values (scripts/lib/wrangler-config.mjs INSTANCE_FIELDS), so a
 // binding, flag or cron added to one and not the other fails here instead of passing tests it shouldn't.
+import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { INSTANCE_FIELDS, instanceConfig, readJsonc, withoutInstanceValues } from "../../scripts/lib/wrangler-config.mjs";
 import { REPO_ROOT } from "../../scripts/lib/wrangler.mjs";
-import { main } from "../../scripts/wrangler-config.mjs";
 
 const example = readJsonc("wrangler.example.jsonc");
 const test = readJsonc("wrangler.test.jsonc");
@@ -25,7 +25,7 @@ describe("readJsonc", () => {
     const dir = mkdtempSync(join(tmpdir(), "ai-jsonc-"));
     try {
       const file = join(dir, "c.jsonc");
-      writeFileSync(file, '﻿// head\n{\n  /* block */ "url": "https://x.test//a/*b*/", // tail\n  "list": [1, 2,],\n}\n');
+      writeFileSync(file, '\uFEFF// head\n{\n  /* block */ "url": "https://x.test//a/*b*/", // tail\n  "list": [1, 2,],\n}\n');
       expect(readJsonc(file)).toEqual({ url: "https://x.test//a/*b*/", list: [1, 2] });
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -56,9 +56,11 @@ describe("readJsonc", () => {
 
 describe("scripts/wrangler-config.mjs", () => {
   it("writes the recorded config for an instance", async () => {
-    // main() writes next to wrangler.example.jsonc only, so the output gets a name nothing else uses.
+    // Run as the deploy action runs it: plain Node, so the parser loads the way it does there. The script writes
+    // next to wrangler.example.jsonc only, so the output gets a name nothing else uses.
     const name = `wrangler.test-output-${process.pid}.jsonc`;
     const env = {
+      ...process.env,
       WORKER_NAME: "agent-inbox-second",
       D1_DATABASE_ID: "11111111-2222-4333-8444-555555555555",
       ACCESS_TEAM_DOMAIN: "team.cloudflareaccess.com",
@@ -66,13 +68,11 @@ describe("scripts/wrangler-config.mjs", () => {
       PUBLIC_URL: "https://agent-inbox.example.workers.dev/",
       EXTRA_VARS: '{"CHANGES_RETENTION_DAYS":"60"}',
     };
-    vi.spyOn(console, "error").mockImplementation(() => {});
     try {
-      expect(main(["--out", name], env)).toBe(0);
+      execFileSync(process.execPath, ["scripts/wrangler-config.mjs", "--out", name, "--force"], { cwd: REPO_ROOT, env, stdio: "pipe" });
       await expect(readFileSync(join(REPO_ROOT, name), "utf8")).toMatchFileSnapshot("../fixtures/wrangler-config/generated.jsonc");
     } finally {
       rmSync(join(REPO_ROOT, name), { force: true });
-      vi.restoreAllMocks();
     }
   });
 });

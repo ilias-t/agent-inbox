@@ -11,7 +11,7 @@ import { parse, printParseErrorCode } from "jsonc-parser";
 // dropped). jsonc-parser recovers from errors and returns what it could read,
 // so any error throws here instead, naming the first one's line and column.
 export function readJsonc(path) {
-  const text = readFileSync(path, "utf8").replace(/^﻿/, "");
+  const text = readFileSync(path, "utf8").replace(/^\uFEFF/, "");
   const errors = [];
   const config = parse(text, errors, { allowTrailingComma: true });
   if (errors.length) {
