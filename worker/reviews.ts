@@ -32,6 +32,7 @@ export interface HeadBump {
   routine: string;
   actor: string;
   now: string;
+  fleet?: string | null; // the writing token's fleet, stored when this write creates the routine (docs/api.md "Fleets")
   stamp?: string; // ?2 for `when`
   lastStamp?: string | null; // a finished run's stamp: raises last_stamp when newer
   // Replaces next_run_at when given (null clears it: the routine has no schedule), but only from the newest run the
@@ -40,13 +41,14 @@ export interface HeadBump {
   when?: string; // the write's predicate (RUN_NOT_FINISHED, RUN_ABSENT); always true when absent
 }
 
-// The head write every review write path makes: create the routine at version 1, or bump its version. Its
-// trigger appends the write's one `changes` row (collection 'reviews', orchestrator = routine).
+// The head write every review write path makes: create the routine at version 1, in the writer's fleet, or bump
+// its version (its fleet stays). Its trigger appends the write's one `changes` row (collection 'reviews',
+// orchestrator = routine, fleet = the routine's).
 export function headBump(db: D1Database, h: HeadBump): D1PreparedStatement {
   return db
     .prepare(
-      `INSERT INTO review_routines (routine, version, last_stamp, next_run_at, updated_at, updated_by)
-       SELECT ?1, 1, ?3, ?4, ?5, ?6 WHERE ${h.when ?? "1"}
+      `INSERT INTO review_routines (routine, version, last_stamp, next_run_at, updated_at, updated_by, fleet)
+       SELECT ?1, 1, ?3, ?4, ?5, ?6, ?8 WHERE ${h.when ?? "1"}
        ON CONFLICT (routine) DO UPDATE SET
          version = review_routines.version + 1,
          last_stamp = CASE WHEN excluded.last_stamp IS NOT NULL
@@ -61,7 +63,7 @@ export function headBump(db: D1Database, h: HeadBump): D1PreparedStatement {
          updated_at = excluded.updated_at,
          updated_by = excluded.updated_by`,
     )
-    .bind(h.routine, h.stamp ?? "", h.lastStamp ?? null, h.nextRunAt ?? null, h.now, h.actor, h.nextRunAt === undefined ? 0 : 1);
+    .bind(h.routine, h.stamp ?? "", h.lastStamp ?? null, h.nextRunAt ?? null, h.now, h.actor, h.nextRunAt === undefined ? 0 : 1, h.fleet ?? null);
 }
 
 // --- What a report stores ------------------------------------------------------------------------------------
@@ -147,22 +149,22 @@ export function canonicalJson(v: unknown): string {
 
 export const bodySha = (body: unknown) => sha256Hex(canonicalJson(body));
 
-const RUN_COLS = "routine, stamp, started_at, finished_at, result, dry, has_report, report_sha, data";
+export const RUN_COLS = "routine, stamp, started_at, finished_at, result, dry, has_report, report_sha, data";
 
 // The report's statements, in the order they must run: the head first, the run last (statements 2-4 read
 // "is the run finished?" and the newest stored report, which the run row would change).
 export function reportStatements(
   db: D1Database,
-  w: { routine: string; actor: string; now: string; sha: string; payload: ReviewReportPayload },
+  w: { routine: string; actor: string; now: string; fleet: string | null; sha: string; payload: ReviewReportPayload },
 ): D1PreparedStatement[] {
-  const { routine, actor, now, payload: p } = w;
+  const { routine, actor, now, fleet, payload: p } = w;
   const stamp = p.stamp;
   const report = p.report ?? null;
   const started = p.started_at ? new Date(p.started_at).toISOString() : stampTime(stamp)!;
   const finished = p.finished_at ? new Date(p.finished_at).toISOString() : now;
   const record = runRecord(stamp, { ...p, started_at: started, finished_at: finished }, report);
   const stmts = [
-    headBump(db, { routine, actor, now, stamp, lastStamp: stamp, nextRunAt: nextRun(p.next_run_at), when: RUN_NOT_FINISHED }),
+    headBump(db, { routine, actor, now, fleet, stamp, lastStamp: stamp, nextRunAt: nextRun(p.next_run_at), when: RUN_NOT_FINISHED }),
   ];
   if (report) {
     const rows = report.prs.map((pr) => ({
@@ -237,13 +239,13 @@ export function reportStatements(
 // A start's statements: the head, then the run as `running`, both only while the run doesn't exist.
 export function startStatements(
   db: D1Database,
-  w: { routine: string; actor: string; now: string; stamp: string; body: ReviewStartPayload },
+  w: { routine: string; actor: string; now: string; fleet: string | null; stamp: string; body: ReviewStartPayload },
 ): D1PreparedStatement[] {
-  const { routine, actor, now, stamp, body } = w;
+  const { routine, actor, now, fleet, stamp, body } = w;
   const started = body.started_at ? new Date(body.started_at).toISOString() : stampTime(stamp)!;
   const record: Partial<ReviewRunRecord> = { stamp, started, finished: null, dry: body.dry === true, result: "running", log: str(body.log), model: str(body.model) };
   return [
-    headBump(db, { routine, actor, now, stamp, nextRunAt: nextRun(body.next_run_at), when: RUN_ABSENT }),
+    headBump(db, { routine, actor, now, fleet, stamp, nextRunAt: nextRun(body.next_run_at), when: RUN_ABSENT }),
     db
       .prepare(
         `INSERT INTO review_runs (${RUN_COLS})
@@ -300,7 +302,8 @@ export const toHead = (r: HeadRow): ReviewRoutineHead => ({ ...r, run_request: r
 
 // /api/state's `routines` and the delta's copy: every routine (or just `?2`'s, for an orchestrator token, when
 // `scopeParam` names it), with its newest finished run.
-export const routinesSql = (scopeParam: string) =>
+// `fleetParam`, when given, limits the list to that fleet's routines (a token's: docs/api.md "Fleets").
+export const routinesSql = (scopeParam: string, fleetParam?: string) =>
   `SELECT h.routine AS id, h.version, r.finished_at AS last_run_at, r.result
    FROM review_routines AS h LEFT JOIN review_runs AS r ON r.routine = h.routine AND r.stamp = h.last_stamp
-   WHERE (${scopeParam} = '' OR h.routine = ${scopeParam}) ORDER BY h.routine`;
+   WHERE (${scopeParam} = '' OR h.routine = ${scopeParam})${fleetParam ? ` AND h.fleet IS ${fleetParam}` : ""} ORDER BY h.routine`;

@@ -2,6 +2,7 @@
 
 import type { Change } from "../../shared/types.ts";
 import { orchestratorScope } from "../auth.ts";
+import { fleetChangesSql, fleetFilter, SHARED_CHANGES } from "../fleets.ts";
 import { badRequest, json } from "../http.ts";
 import type { Ctx, Route } from "../router.ts";
 import { latestSeq } from "../store.ts";
@@ -25,6 +26,15 @@ const COLLECTION_FILTERS: Record<string, string> = {
 // before the LIMIT so a page of others' changes can't hide its own.
 const SCOPE_FILTER = "AND orchestrator = ?1";
 
+// Fleets (docs/api.md "Fleets"): the triggers record each change's fleet too
+// (migration 0012). A token sees its own fleet's rows (a manager token those
+// of its own orchestrator id in it); a human, every fleet, or one with
+// ?fleet=, as that fleet's orchestrator token sees it. ?4 is the fleet. A
+// manager token's rows are found through changes_orchestrator, as before
+// (`+fleet` keeps the planner off changes_fleet).
+const FLEET_FILTER = (named: boolean) => `AND ${fleetChangesSql(named, "?4")}`;
+const MANAGER_FLEET_FILTER = "AND +fleet IS ?4";
+
 // Snoozes and pins are one human's own (migrations 0007, 0010): only that
 // human's feed shows them, so teammates' pages don't refetch and no token
 // (the manager's `wait --human` included) ever wakes on one. ?3 is the
@@ -45,16 +55,33 @@ async function changes(c: Ctx): Promise<Response> {
   if (since === undefined) return json({ cursor: await latestSeq(db), changes: [] });
   const wait = Math.min(intParam(q.get("wait"), "wait") ?? 0, WAIT_MAX_S);
   const collection = q.get("collection");
-  if (collection && !(collection in COLLECTION_FILTERS)) {
+  if (collection && !Object.hasOwn(COLLECTION_FILTERS, collection)) {
     throw badRequest(`collection must be one of ${Object.keys(COLLECTION_FILTERS).join(", ")}`);
   }
   const scope = orchestratorScope(c.caller);
-  const sql = `SELECT seq, collection, doc_id, op, version, status, actor, at FROM changes
-    WHERE seq > ?2 ${collection ? COLLECTION_FILTERS[collection] : ""} ${scope !== null ? SCOPE_FILTER : ""} ${SNOOZE_FILTER}
-    ORDER BY seq LIMIT ${PAGE}`;
+  const fleet = fleetFilter(c.caller, q);
+  const fleetSql = fleet === undefined ? "" : scope !== null ? MANAGER_FLEET_FILTER : FLEET_FILTER(fleet !== null);
+  const cols = "seq, collection, doc_id, op, version, status, actor, at";
+  const tail = `${collection ? COLLECTION_FILTERS[collection] : ""} ${SNOOZE_FILTER} ORDER BY seq LIMIT ${PAGE}`;
+  // A named fleet's rows are two index ranges, its own (changes_fleet) and the shared ones (changes_shared), each
+  // read in order up to a page and then merged: one OR over both would scan every default-fleet row after the
+  // cursor on each poll of an idle fleet.
+  // A collection filter that no shared row can match skips that range.
+  const shared = !collection || collection === "meta";
+  const sql =
+    fleet && scope === null
+      ? shared
+        ? `SELECT * FROM (SELECT ${cols} FROM changes WHERE seq > ?2 AND fleet = ?4 ${tail})
+           UNION ALL SELECT * FROM (SELECT ${cols} FROM changes INDEXED BY changes_shared WHERE seq > ?2 AND ${SHARED_CHANGES} ${tail})
+           ORDER BY seq LIMIT ${PAGE}`
+        : `SELECT ${cols} FROM changes WHERE seq > ?2 AND fleet = ?4 ${tail}`
+      : `SELECT ${cols} FROM changes
+         WHERE seq > ?2 ${scope !== null ? SCOPE_FILTER : ""} ${fleetSql} ${tail}`;
   const p = c.caller.principal;
   const self = p.kind === "human" ? `human:${p.email.toLowerCase()}` : "";
-  const stmt = db.prepare(sql).bind(scope ?? "", Math.floor(since), self);
+  // ?4 is bound only when the SQL names it: the default fleet's orchestrator-token filter doesn't.
+  const bindFleet = fleetSql.includes("?4");
+  const stmt = db.prepare(sql).bind(scope ?? "", Math.floor(since), self, ...(bindFleet ? [fleet] : []));
 
   // A long-poll the client has abandoned (tab hidden, navigation, network
   // drop) stops querying D1 straight away rather than at its deadline. The

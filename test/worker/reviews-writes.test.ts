@@ -360,17 +360,17 @@ describe("D1 statements per report", () => {
     return ran;
   }
 
-  it("is the same for 3 PRs and 45: the token lookup and one batch of five", async () => {
+  it("is the same for 3 PRs and 45: the token lookup and one batch of six (the fleet guard and five writes)", async () => {
     const r = await routine();
     const small = await countReport(r, { stamp: stamp(0), result: "ok", report: sampleReport(3) });
     const big = await countReport(r, { stamp: stamp(30), result: "ok", report: sampleReport(45) });
     console.log(`D1 statements for a 45-PR report: ${big.length} (${big.filter((s) => s.startsWith("batch:")).length} in its batch)`);
     expect(big.length).toBe(small.length);
-    expect(big.length).toBe(6);
-    expect(big.filter((s) => s.startsWith("batch:"))).toHaveLength(5);
+    expect(big.length).toBe(7);
+    expect(big.filter((s) => s.startsWith("batch:"))).toHaveLength(6);
   });
 
-  it("a replay adds one read to tell a replay from a conflict, and nothing else", async () => {
+  it("a replay adds one read (the run, with its routine's fleet) to tell a replay from a conflict, and nothing else", async () => {
     const r = await routine();
     const body = { stamp: stamp(0), result: "ok", report: sampleReport(45) };
     await r.report(body as never);
@@ -388,7 +388,7 @@ describe("D1 statements per report", () => {
     );
     await waitOnExecutionContext(ctx);
     expect(res.status).toBe(200);
-    expect(ran).toHaveLength(7);
+    expect(ran).toHaveLength(9);
   });
 });
 

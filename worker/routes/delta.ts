@@ -13,7 +13,8 @@ import type {
   StateDelta,
   StateDeltaReset,
 } from "../../shared/types.ts";
-import { orchestratorScope } from "../auth.ts";
+import { fleetScope, orchestratorScope } from "../auth.ts";
+import { fleetChangesSql } from "../fleets.ts";
 import { badRequest, json } from "../http.ts";
 import type { Ctx, Route } from "../router.ts";
 import { COLS, toDoc, type DocRow } from "../store.ts";
@@ -31,26 +32,40 @@ function sinceParam(c: Ctx): number {
   return Number(raw);
 }
 
-// The shared head of every statement in the batch, which binds the same five parameters to each (`p` only
-// names them all, so every statement takes five): ?1 since, ?2 the orchestrator scope ('' for none), ?3 the
-// caller's actor for snoozes and pins ('' for a token), ?4 their email, ?5 now. They are used directly, not through `p`,
-// so `seq > ?1` stays a range scan of the primary key.
+// Whose view: a human's (every fleet), a fleet's orchestrator token's (the default fleet's, or a named one's;
+// docs/api.md "Fleets"), or a manager token's (its own items and doc, in its fleet).
+type View = "all" | "fleet" | "named" | "manager";
+
+// The shared head of every statement in the batch, which binds the same six parameters to each (`p` only
+// names them all, so every statement takes six): ?1 since, ?2 the orchestrator scope ('' for none), ?3 the
+// caller's actor for snoozes and pins ('' for a token), ?4 their email, ?5 now, ?6 a token's fleet (null for
+// the default fleet, and for a human, who doesn't use it). They are used directly, not through `p`, so
+// `seq > ?1` stays a range scan of the primary key.
 //
 // `ok` is 1 when the log still holds every change after `since` and there are at most DELTA_MAX_CHANGES of
 // them: seq is AUTOINCREMENT and never reused, so cursor - since rows must be there, and fewer means some were
 // pruned (by age, so possibly from the middle when an imported doc carried an old updated_at). The CASE keeps
 // the count to a short range scan. `ch` is each doc (collection, doc_id) the caller may see changed after
 // `since`, deduped; empty unless ok.
-function head(scoped: boolean): string {
+function head(view: View): string {
   // As /api/changes (SCOPE_FILTER there), plus two rows /api/changes doesn't show an orchestrator token:
   // meta/schedule, which its /api/state includes, and later changes to an item it had owned (reassigned away,
-  // logged under the new orchestrator), so the item leaves its state as it would on a refetch. Only ids it
-  // already knew come back that way, as deletes.
-  const scope = scoped
-    ? `AND (orchestrator = ?2 OR (collection = 'meta' AND doc_id = 'schedule')
-         OR (collection = 'items' AND doc_id IN (SELECT doc_id FROM changes WHERE orchestrator = ?2 AND collection = 'items')))`
-    : "";
-  return `WITH p AS (SELECT ?1, ?2, ?3, ?4, ?5),
+  // logged under the new orchestrator, or moved to another fleet), so the item leaves its state as it would on
+  // a refetch. Only ids it already knew come back that way, as deletes.
+  //
+  // A fleet's token: as /api/changes (FLEET_FILTER there). A doc an admin moved out of its fleet comes with
+  // the rest: the move logs a row under the fleet it left (migration 0012), which the doc fails visibleDocs on.
+  // `+fleet` keeps a manager token's rows on changes_orchestrator. Its reassigned-away clause takes only rows in its
+  // own fleet: a move out logs under its fleet and orchestrator, and what happens to the doc in another fleet later
+  // isn't its business.
+  const scope =
+    view === "manager"
+      ? `AND ((orchestrator = ?2 AND +fleet IS ?6) OR (collection = 'meta' AND doc_id = 'schedule')
+         OR (collection = 'items' AND +fleet IS ?6 AND doc_id IN (SELECT doc_id FROM changes WHERE orchestrator = ?2 AND +fleet IS ?6 AND collection = 'items')))`
+      : view === "fleet" || view === "named"
+        ? `AND ${fleetChangesSql(view === "named", "?6")}`
+        : "";
+  return `WITH p AS (SELECT ?1, ?2, ?3, ?4, ?5, ?6),
   head AS (SELECT coalesce(max(seq), 0) AS cursor FROM changes),
   ok AS (
     SELECT CASE WHEN cursor - ?1 BETWEEN 0 AND ${DELTA_MAX_CHANGES}
@@ -70,24 +85,28 @@ function head(scoped: boolean): string {
 // now, and was it at `since`, by its last change at or before the cursor (a delete: not there, so no), or, when
 // it has none, not there yet if its first change in the window created it. An item whose history was pruned
 // can't be told, so it counts as a change. An orchestrator token's count also moves when an item is reassigned
-// to or from it, so any item change recounts there (its items are few).
-function archivedMayChange(scoped: boolean): string {
-  if (scoped) return "EXISTS (SELECT 1 FROM ch WHERE collection = 'items')";
+// to or from it, so any item change recounts there (its items are few). For a fleet's token "archived" means
+// archived in its fleet, by the fleet each change row recorded, so a move in or out counts too.
+function archivedMayChange(view: View): string {
+  if (view === "manager") return "EXISTS (SELECT 1 FROM ch WHERE collection = 'items')";
+  const mine = view === "fleet" || view === "named" ? " AND fleet IS ?6" : "";
   return `EXISTS (SELECT 1 FROM ch WHERE ch.collection = 'items' AND
-    coalesce((SELECT status = 'archived' FROM docs WHERE collection = 'items' AND id = ch.doc_id), 0) IS NOT coalesce(
-      (SELECT CASE WHEN op = 'delete' THEN 0 ELSE coalesce(status = 'archived', 0) END FROM changes
+    coalesce((SELECT status = 'archived'${mine} FROM docs WHERE collection = 'items' AND id = ch.doc_id), 0) IS NOT coalesce(
+      (SELECT CASE WHEN op = 'delete' THEN 0 ELSE coalesce(status = 'archived'${mine}, 0) END FROM changes
         WHERE collection = 'items' AND doc_id = ch.doc_id AND seq <= ?1 ORDER BY seq DESC LIMIT 1),
       (SELECT CASE WHEN op = 'create' THEN 0 END FROM changes
         WHERE collection = 'items' AND doc_id = ch.doc_id AND seq > ?1 ORDER BY seq LIMIT 1)))`;
 }
 
 // The docs /api/state would show the caller, of `d`.
-function visibleDocs(scoped: boolean): string {
-  return scoped
-    ? `(d.collection = 'items' AND d.orchestrator = ?2)
-       OR (d.collection = 'orchestrators' AND d.id = ?2)
-       OR (d.collection = 'meta' AND d.id = 'schedule')`
-    : `d.collection IN ('items', 'orchestrators') OR (d.collection = 'meta' AND d.id IN ('manager', 'lease', 'schedule'))`;
+function visibleDocs(view: View): string {
+  if (view === "manager") {
+    return `(d.collection = 'items' AND d.orchestrator = ?2 AND d.fleet IS ?6)
+       OR (d.collection = 'orchestrators' AND d.id = ?2 AND d.fleet IS ?6)
+       OR (d.collection = 'meta' AND d.id = 'schedule')`;
+  }
+  const docs = view === "all" ? "d.collection IN ('items', 'orchestrators')" : "(d.collection IN ('items', 'orchestrators') AND d.fleet IS ?6)";
+  return `${docs} OR (d.collection = 'meta' AND d.id IN ('manager', 'lease', 'schedule'))`;
 }
 
 const D_COLS = COLS.split(", ").map((col) => `d.${col}`).join(", ");
@@ -96,23 +115,25 @@ async function delta(c: Ctx): Promise<Response> {
   const since = sinceParam(c);
   const db = c.env.DB;
   const scope = orchestratorScope(c.caller);
-  const scoped = scope !== null;
+  const fleet = fleetScope(c.caller);
+  const view: View = scope !== null ? "manager" : fleet === undefined ? "all" : fleet === null ? "fleet" : "named";
   const p = c.caller.principal;
   const email = p.kind === "human" ? p.email.toLowerCase() : "";
-  const binds = [since, scope ?? "", email ? `human:${email}` : "", email, c.now];
-  const pre = head(scoped);
+  const binds = [since, scope ?? "", email ? `human:${email}` : "", email, c.now, fleet ?? null];
+  const pre = head(view);
   const stmt = (sql: string) => db.prepare(pre + sql).bind(...binds);
-  const own = scoped ? " AND orchestrator = ?2" : "";
+  // `+fleet` beside orchestrator keeps a manager token's count on docs_orchestrator (its few items).
+  const own = view === "manager" ? " AND orchestrator = ?2 AND +fleet IS ?6" : view === "all" ? "" : " AND fleet IS ?6";
 
   const [top, keys, docs, users, snoozes, pins, routines] = await db.batch<any>([
     stmt(`SELECT head.cursor, ok.ok,
-      CASE WHEN ${archivedMayChange(scoped)}
+      CASE WHEN ${archivedMayChange(view)}
         THEN (SELECT count(*) FROM docs WHERE collection = 'items' AND status = 'archived'${own}) END AS archived
       FROM head, ok`),
     stmt("SELECT collection, doc_id FROM ch ORDER BY collection, doc_id"),
     // CROSS JOIN keeps ch outermost: a primary-key lookup per changed doc, never a scan of docs.
     stmt(`SELECT ${D_COLS} FROM ch CROSS JOIN docs AS d ON d.collection = ch.collection AND d.id = ch.doc_id
-      WHERE ${visibleDocs(scoped)}`),
+      WHERE ${visibleDocs(view)}`),
     // Orchestrator tokens see no people (and no users rows reach their ch).
     stmt(`SELECT email, name, ntfy_topic FROM users WHERE EXISTS (SELECT 1 FROM ch WHERE collection = 'users') ORDER BY email`),
     // The caller's snoozes still to come, as /api/state lists them.
@@ -121,7 +142,7 @@ async function delta(c: Ctx): Promise<Response> {
     // The caller's pins, as /api/state lists them.
     stmt(`SELECT * FROM (${PINS_SQL.replace("?1", "?4")}) WHERE EXISTS (SELECT 1 FROM ch WHERE collection = 'pins')`),
     // Review routines, as /api/state lists them, when one changed (its head's change row is in ch).
-    stmt(`SELECT * FROM (${routinesSql("?2")}) WHERE EXISTS (SELECT 1 FROM ch WHERE collection = 'reviews') ORDER BY id`),
+    stmt(`SELECT * FROM (${routinesSql("?2", view === "all" ? undefined : "?6")}) WHERE EXISTS (SELECT 1 FROM ch WHERE collection = 'reviews') ORDER BY id`),
   ]);
   const { cursor, ok, archived } = top.results[0] as { cursor: number; ok: number; archived: number | null };
   if (!ok) return json({ reset: true } satisfies StateDeltaReset);
@@ -154,7 +175,7 @@ async function delta(c: Ctx): Promise<Response> {
       else if (id === "lease") body.lease = row && toDoc<Lease>(row);
       else if (id === "schedule") body.schedule = scheduleView(row && toDoc<Schedule>(row));
     } else if (collection === "users") {
-      body.people = scoped ? [] : users.results.map(toPerson);
+      body.people = view === "manager" ? [] : users.results.map(toPerson);
     } else if (collection === "reviews") {
       reviews.push(id);
     } else if (collection === "snoozes") {

@@ -86,6 +86,7 @@ describe("admins", () => {
       kind: "token",
       name: "mgr-admin",
       scope: "manager",
+      fleet: "default",
     });
   });
 });

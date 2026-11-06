@@ -126,3 +126,11 @@ export function person(email: string, vars: Record<string, string | undefined> =
     del: <T = any>(path: string, body?: unknown) => callAs<T>(email, "DELETE", path, body, vars),
   };
 }
+
+// A token bound to a fleet (docs/api.md "Fleets"; null: the default fleet). No route mints one yet, so this
+// sets tokens.fleet directly, as an admin's SQL would.
+export async function mintFleetToken(fleet: string | null, scope: "manager" | "orchestrator" = "manager", orchestrator?: string) {
+  const t = await mintToken(scope, orchestrator);
+  await env.DB.prepare("UPDATE tokens SET fleet = ? WHERE id = ?").bind(fleet, t.token.id).run();
+  return t;
+}

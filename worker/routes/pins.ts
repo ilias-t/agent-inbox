@@ -6,6 +6,7 @@ import type { PinKind, PinResponse } from "../../shared/types.ts";
 import { requireHuman } from "../auth.ts";
 import { badRequest, json, notFound } from "../http.ts";
 import type { Ctx, Route } from "../router.ts";
+import { pinClause, type DeletePin } from "../store.ts";
 
 // What each kind pins, and the statement's test that it exists (?1 the ref; ?2, ?3 a PR's routine and number).
 const TARGET: Record<PinKind, { what: string; exists: string }> = {
@@ -55,13 +56,13 @@ const unpin = (kind: PinKind) => async (c: Ctx): Promise<Response> => {
 
 // Everyone's pins on an item or orchestrator, dropped in the same transaction as its delete (worker/store.ts
 // deleteDoc's `before`), under the same version pin: all happen or none does.
-export function dropPins(db: D1Database, kind: "item" | "orch", id: string, collection: string, pin: number | undefined) {
+export function dropPins(db: D1Database, kind: "item" | "orch", id: string, collection: string, pin: DeletePin) {
   return db
     .prepare(
       `DELETE FROM pins WHERE kind = ?1 AND ref = ?2 AND EXISTS
-         (SELECT 1 FROM docs WHERE collection = ?3 AND id = ?2 AND (?4 IS NULL OR version = ?4))`,
+         (SELECT 1 FROM docs WHERE collection = ?3 AND id = ?2 AND ${pinClause("?4", "?5")})`,
     )
-    .bind(kind, id, collection, pin ?? null);
+    .bind(kind, id, collection, pin.version ?? null, pin.createdAt ?? null);
 }
 
 export const pinRoutes: Route[] = [

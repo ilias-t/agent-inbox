@@ -8,6 +8,11 @@ import { createItem, human, setRoles, uid } from "./helpers.ts";
 import { changesFor, maxSeq, reportOf, routine, stamp } from "./reviews-helpers.ts";
 
 const M0011 = env.TEST_MIGRATIONS.find((m) => m.name.startsWith("0011"))!;
+// 0012 adds review_routines.fleet after run_request and recreates the head's triggers to log it. The database as
+// it is before 0011 has neither, so the rollback takes 0012's part on review_routines back first (its triggers as
+// 0009 wrote them), and the migration re-applies it after 0011.
+const M0009_TRIGGERS = env.TEST_MIGRATIONS.find((m) => m.name.startsWith("0009"))!.queries.filter((q) => /CREATE TRIGGER review_routines_/.test(q));
+const M0012_HEAD = env.TEST_MIGRATIONS.find((m) => m.name.startsWith("0012"))!.queries.filter((q) => q.replace(/--.*$/gm, "").includes("review_routines"));
 
 const schema = async () =>
   (
@@ -27,20 +32,31 @@ async function data() {
   return out;
 }
 
-// The rollback in 0011's header.
-const rollback = () => env.DB.prepare("ALTER TABLE review_routines DROP COLUMN run_request").run();
-const migrate = () => env.DB.batch(M0011.queries.map((q) => env.DB.prepare(q)));
+// The rollback in 0011's header, after 0012's on review_routines.
+const rollback = () =>
+  env.DB.batch(
+    [
+      "DROP TRIGGER review_routines_ai",
+      "DROP TRIGGER review_routines_au",
+      "DROP TRIGGER review_routines_ad",
+      "ALTER TABLE review_routines DROP COLUMN fleet",
+      ...M0009_TRIGGERS,
+      "ALTER TABLE review_routines DROP COLUMN run_request",
+    ].map((q) => env.DB.prepare(q)),
+  );
+const migrate = () => env.DB.batch([...M0011.queries, ...M0012_HEAD].map((q) => env.DB.prepare(q)));
 const columns = async () => (await env.DB.prepare("SELECT name FROM pragma_table_info('review_routines') ORDER BY cid").all<{ name: string }>()).results.map((c) => c.name);
 
 describe("migration 0011_review_run_request", () => {
   it("only adds review_routines.run_request; its rollback leaves no trace of it", async () => {
     const full = await schema();
-    expect((await columns()).at(-1)).toBe("run_request");
+    expect((await columns()).slice(-2)).toEqual(["run_request", "fleet"]);
     await rollback();
     const before = await schema();
     expect(await columns()).not.toContain("run_request");
-    // Nothing but review_routines' own definition differs.
-    expect(full.filter((o) => o.name !== "review_routines")).toEqual(before.filter((o) => o.name !== "review_routines"));
+    // Nothing but review_routines' own definition (and 0012's triggers on it) differs.
+    const own = (o: { tbl_name: string }) => o.tbl_name !== "review_routines";
+    expect(full.filter(own)).toEqual(before.filter(own));
     await migrate();
     expect(await schema()).toEqual(full);
   });
@@ -56,7 +72,7 @@ describe("migration 0011_review_run_request", () => {
     await migrate();
     const after = await data();
     // The one difference: each head row now has run_request, null.
-    expect(after.review_routines).toEqual(rows.review_routines.map((h) => ({ ...(h as object), run_request: null })));
+    expect(after.review_routines).toEqual(rows.review_routines.map((h) => ({ ...(h as object), run_request: null, fleet: null })));
     expect({ ...after, review_routines: [] }).toEqual({ ...rows, review_routines: [] });
     expect(await maxSeq()).toBe(seq);
   });

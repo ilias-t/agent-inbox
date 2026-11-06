@@ -8,8 +8,12 @@ import { describe, expect, it } from "vitest";
 import { createItem, human, person, setRoles, uid } from "./helpers.ts";
 
 const M0009 = env.TEST_MIGRATIONS.find((m) => m.name.startsWith("0009"))!;
-// Later migrations that change the review tables, re-applied after 0009 so the schema matches the suite's again.
-const LATER = env.TEST_MIGRATIONS.filter((m) => m.name.startsWith("0011"));
+// Later migrations that change the review tables, re-applied after 0009 so the schema matches the suite's again:
+// 0011, and 0012's statements on review_routines (its fleet column and recreated triggers).
+const LATER = [
+  ...env.TEST_MIGRATIONS.filter((m) => m.name.startsWith("0011")),
+  ...env.TEST_MIGRATIONS.filter((m) => m.name.startsWith("0012")).map((m) => ({ ...m, queries: m.queries.filter((q) => q.replace(/--.*$/gm, "").includes("review_routines")) })),
+];
 const REVIEW_TABLES = ["review_events", "review_prs", "review_runs", "review_routines"];
 
 const schema = async () =>

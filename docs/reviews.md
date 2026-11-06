@@ -59,8 +59,10 @@ fi
 | Caller | Read | Write |
 |---|---|---|
 | Manager token (`orchestrator = R`) | routine `R` only (another routine is 403; `GET /reviews` lists only `R`) | routine `R`: start, report, and its run requests' updates |
-| Orchestrator token | every routine | nothing (403) |
+| Orchestrator token | every routine of its own fleet | nothing (403) |
 | Human, any role | every routine | deciders and admins: a run request (the Run button); admins only: `DELETE /reviews/:routine` |
+
+A routine belongs to the fleet of the token that first wrote it ([api.md, "Fleets"](api.md#fleets)). A token of another fleet gets 403 on it, for reads and writes alike, and `GET /reviews` lists only its own fleet's routines.
 
 ## Endpoints
 
@@ -275,7 +277,7 @@ A report is one `db.batch` (one transaction), the same five statements however m
 
 Statements 2 to 4 run only for a report, and they move PR state only forward. **The newest report decides.** A PR row changes only when the report is newer than the run that last wrote that row. A report older than the routine's newest stored report (a late retry) clears no `gone_at`, marks nothing gone, and inserts the PRs it alone lists as already gone. A PR that the newest report dropped never comes back from an older one.
 
-A start is one batch of two statements (head, run), each conditional on the run not being finished.
+A start is one batch of two statements (head, run), each conditional on the run not being finished, behind the fleet guard (below).
 
 ### Change log
 
@@ -288,7 +290,7 @@ Only the head row logs: triggers on `review_routines` append exactly one `change
 ### Limits
 
 - `POST /reviews/report` reads bodies up to 1 MiB. Every other route keeps 256 KiB. The real 45-PR report is 136 KB.
-- One report is the same handful of D1 statements whatever its size: the token lookup, then the batch of five (`test/worker/reviews-writes.test.ts` asserts the count is the same for 3 and 45 PRs).
+- One report is the same handful of D1 statements whatever its size: the token lookup, then one batch: a guard that fails it when the routine belongs to another fleet (403, [api.md, "Fleets"](api.md#fleets)), and the five writes (`test/worker/reviews-writes.test.ts` asserts the count is the same for 3 and 45 PRs).
 
 ### Retention
 
