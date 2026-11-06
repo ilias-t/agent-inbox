@@ -17,6 +17,7 @@ import {
 import {
   changeLine,
   docSummary,
+  fleetsText,
   itemDetail,
   itemsList,
   leaseText,
@@ -41,6 +42,47 @@ import { changeMatcher, waitForChanges } from "./wait.mjs";
 export const EXIT_TIMEOUT = 4;
 // Exit code for `schedule --check` outside work hours.
 export const EXIT_OFF_HOURS = 5;
+// Exit code for `me --expect-fleet` when the token belongs to another fleet (as a conflict, 3).
+export const EXIT_WRONG_FLEET = 3;
+
+// A fleet as the API names it: "default" or a fleet id (docs/api.md "Fleets").
+const FLEET_RE = /^[a-z][a-z0-9-]{0,31}$/;
+const DEFAULT_FLEET = "default";
+// The fleet a principal belongs to: a token's (a server before fleets sends none: the default fleet, its only
+// one), or null for a person, who sees every fleet.
+const fleetOf = (me) => (me?.kind === "token" ? (me.fleet ?? DEFAULT_FLEET) : null);
+const fleetOpt = { fleet: { type: "string" } };
+
+function fleetArg(value, flag = "--fleet") {
+  if (!FLEET_RE.test(value)) throw new UsageError(`${flag} must be default or a fleet id (lowercase, starting with a letter): ${value}`);
+  return value;
+}
+
+// --fleet <id>: a filter for callers who see more than one fleet (people). A token sees only its own fleet, so
+// naming another is an error rather than a filter the server would quietly ignore; naming its own is a no-op. A
+// person's named fleet must be in the server's registry: a server without one may ignore the filter and answer
+// with every item (`registry: false` skips this, for `state`, which checks the fleet in what it read). `me` saves a
+// call when the caller already has it. Both errors exit 1.
+async function fleetFilter(ctx, me, { registry = true } = {}) {
+  const want = ctx.values.fleet;
+  if (want === undefined) return undefined;
+  fleetArg(want);
+  const own = fleetOf(me ?? (await ctx.api("GET", "/api/me")));
+  if (own !== null && own !== want) throw new Error(`this token belongs to fleet ${own}, so it sees only that fleet (not ${want})`);
+  if (registry && own === null && want !== DEFAULT_FLEET) {
+    try {
+      await ctx.api("GET", `/api/fleets/${enc(want)}`);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) throw new Error(noFleet(want));
+      throw err;
+    }
+  }
+  return want;
+}
+const noFleet = (fleet) => `no fleet ${fleet} on this server (or the server has no fleet registry, so --fleet can't be checked)`;
+
+// The fleet a doc belongs to, as the API names it.
+const docFleet = (doc) => (doc?.data?.fleet == null ? DEFAULT_FLEET : doc.data.fleet);
 
 const ID_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const enc = encodeURIComponent;
@@ -83,12 +125,12 @@ function withPin(body, pin) {
 
 // PATCH, or create with PUT (if_version 0) when the doc doesn't exist yet and
 // the caller didn't pin a version.
-async function patchOrCreate(api, path, data, pin) {
+async function patchOrCreate(api, path, data, pin, base = async () => ({})) {
   try {
     return await api("PATCH", path, { body: withPin({ data }, pin) });
   } catch (err) {
     if (!(err instanceof ApiError && err.status === 404 && pin === undefined)) throw err;
-    const created = Object.fromEntries(Object.entries(data).filter(([, val]) => val !== null));
+    const created = Object.fromEntries(Object.entries({ ...(await base()), ...data }).filter(([, val]) => val !== null));
     try {
       return await api("PUT", path, { body: { data: created, if_version: 0 } });
     } catch (putErr) {
@@ -103,9 +145,9 @@ async function patchOrCreate(api, path, data, pin) {
 }
 
 // `me` → the caller's email from /api/me (humans only); anything else as given.
-async function emailArg(ctx, value, flag) {
+async function emailArg(ctx, value, flag, me) {
   if (value !== "me") return value;
-  const me = await ctx.api("GET", "/api/me");
+  me ??= await ctx.api("GET", "/api/me");
   if (me?.kind !== "human") throw new UsageError(`${flag} me needs a human principal; this is token ${me?.name ?? "?"}`);
   return me.email;
 }
@@ -147,9 +189,47 @@ const ITEM_FIELDS = {
 export const COMMANDS = [
   {
     name: "me",
-    summary: "Who the token is (principal and scope)",
-    usage: "me",
-    run: async (ctx) => ctx.print(await ctx.api("GET", "/api/me"), principalText),
+    summary: "Who the token is (principal, scope and fleet); --expect-fleet exits 3 when it belongs to another fleet",
+    usage: "me [--expect-fleet <id>]",
+    options: { "expect-fleet": { type: "string" } },
+    run: async (ctx) => {
+      const expected = ctx.values["expect-fleet"];
+      if (expected !== undefined) fleetArg(expected, "--expect-fleet");
+      const me = await ctx.api("GET", "/api/me");
+      ctx.print(me, principalText);
+      if (expected === undefined) return 0;
+      const own = fleetOf(me);
+      if (own === expected) return 0;
+      ctx.log(`agent-inbox: ${own === null ? "a person isn't bound to a fleet" : `this token belongs to fleet ${own}`}, not ${expected}`);
+      return EXIT_WRONG_FLEET;
+    },
+  },
+  {
+    name: "fleets",
+    summary: "Each fleet you can see, with its orchestrator's status: lease holder, next tick and work hours",
+    usage: "fleets",
+    run: async (ctx) => {
+      // People get every fleet in /api/state; a token, its own fleet's status there and its registry doc. A manager
+      // token reads neither the orchestrator's status and lease (/api/state sends them null) nor the registry: its
+      // fleet comes with `status_visible: false`, rather than nulls that read as "nobody holds the lease".
+      const s = await ctx.api("GET", "/api/state", { query: { archived: "0" } });
+      const manager = s.me?.kind === "token" && s.me.scope === "orchestrator";
+      let fleets = s.fleets;
+      if (!fleets) {
+        let doc = null;
+        if (!manager) {
+          try {
+            doc = (await ctx.api("GET", "/api/fleets")).fleets?.[0] ?? null;
+          } catch (err) {
+            // A server before the registry: no label to show.
+            if (!(err instanceof ApiError && err.status === 404)) throw err;
+          }
+        }
+        fleets = { [fleetOf(s.me) ?? DEFAULT_FLEET]: { doc, manager: s.manager, lease: s.lease, schedule: s.schedule } };
+      }
+      const out = manager ? { fleets, status_visible: false } : { fleets };
+      ctx.print(out, (r) => fleetsText(r.fleets, ctx.now(), { statusVisible: !manager }));
+    },
   },
   {
     // Read-only on purpose: tokens can't change roles (a leaked one could make
@@ -161,15 +241,22 @@ export const COMMANDS = [
   },
   {
     name: "state",
-    summary: "Everything the UI loads: items, orchestrators, manager, lease, schedule, cursor",
-    usage: "state",
-    run: async (ctx) => ctx.print(await ctx.api("GET", "/api/state"), (s) => stateText(s, ctx.now())),
+    summary: "Everything the UI loads: items, orchestrators, manager, lease, schedule, cursor (--fleet: one fleet's)",
+    usage: "state [--fleet <id>]",
+    options: fleetOpt,
+    run: async (ctx) => {
+      if (ctx.values.fleet !== undefined) fleetArg(ctx.values.fleet);
+      const s = await ctx.api("GET", "/api/state");
+      const fleet = await fleetFilter(ctx, s.me, { registry: false }); // stateOfFleet checks it in s.fleets
+      ctx.print(fleet === undefined ? s : stateOfFleet(s, fleet), (r) => stateText(r, ctx.now()));
+    },
   },
   {
     name: "items",
     summary: "List items",
-    usage: "items [--status open,decided] [--orchestrator O3] [--qa-pending] [--type decision] [--assignee email|none|me]",
+    usage: "items [--status open,decided] [--orchestrator O3] [--qa-pending] [--type decision] [--assignee email|none|me] [--fleet <id>]",
     options: {
+      ...fleetOpt,
       status: { type: "string" },
       orchestrator: { type: "string" },
       "qa-pending": { type: "boolean" },
@@ -178,8 +265,11 @@ export const COMMANDS = [
     },
     run: async (ctx) => {
       const v = ctx.values;
-      const assignee = v.assignee === undefined ? undefined : await emailArg(ctx, v.assignee, "--assignee");
-      const query = { status: v.status, orchestrator: v.orchestrator, qa_pending: v["qa-pending"] ? "true" : undefined, type: v.type, assignee };
+      // One /api/me read serves both --assignee me and --fleet.
+      const me = v.assignee === "me" && v.fleet !== undefined ? await ctx.api("GET", "/api/me") : undefined;
+      const assignee = v.assignee === undefined ? undefined : await emailArg(ctx, v.assignee, "--assignee", me);
+      const fleet = await fleetFilter(ctx, me);
+      const query = { status: v.status, orchestrator: v.orchestrator, qa_pending: v["qa-pending"] ? "true" : undefined, type: v.type, assignee, fleet };
       ctx.print(await ctx.api("GET", "/api/items", { query }), (r) => itemsList(r.items));
     },
   },
@@ -457,10 +547,17 @@ export const COMMANDS = [
       const path = `/api/meta/${enc(metaId)}`;
       const data = await dataFrom(ctx);
       const pin = ifVersion(ctx.values);
+      // A fleet that inherits the deployment's hours has no schedule doc of its own: --set creates one from the
+      // hours it has now, so a single field can change (a schedule must hold all four).
+      const named = /^schedule:(.+)$/.exec(metaId);
+      const inherited = async () =>
+        metaId === "schedule" || named
+          ? (await ctx.api("GET", "/api/schedule", { query: named ? { fleet: named[1] } : {} })).schedule
+          : {};
       const doc =
         ctx.values.file !== undefined
           ? await ctx.api("PUT", path, { body: withPin({ data }, pin) })
-          : await patchOrCreate(ctx.api, path, data, pin);
+          : await patchOrCreate(ctx.api, path, data, pin, inherited);
       ctx.print(doc, (d) => "saved " + docSummary("meta", d));
     },
   },
@@ -713,12 +810,14 @@ export const COMMANDS = [
   {
     name: "changes",
     summary: "One read of the change feed (long-polls up to --wait seconds)",
-    usage: "changes [--since N] [--wait 0-25] [--collection items|orchestrators|meta|qa]",
-    options: { since: { type: "string" }, wait: { type: "string" }, collection: { type: "string" } },
+    usage: "changes [--since N] [--wait 0-25] [--collection items|orchestrators|meta|qa] [--fleet <id>]",
+    options: { since: { type: "string" }, wait: { type: "string" }, collection: { type: "string" }, ...fleetOpt },
     run: async (ctx) => {
       const v = ctx.values;
       const wait = parseIntFlag(v.wait, "--wait", { min: 0, max: 25 });
-      const query = { since: parseIntFlag(v.since, "--since"), wait, collection: v.collection };
+      const since = parseIntFlag(v.since, "--since"); // flags first: a typo costs no request
+      const fleet = await fleetFilter(ctx);
+      const query = { since, wait, collection: v.collection, fleet };
       const res = await ctx.api("GET", "/api/changes", { query, timeoutMs: ((wait ?? 0) + 15) * 1000 });
       ctx.print(res, (r) => [...r.changes.map(changeLine), `cursor ${r.cursor}`].join("\n"));
     },
@@ -728,8 +827,9 @@ export const COMMANDS = [
     summary: "Block until a matching change arrives, print it and the new cursor (exit 4 on --timeout)",
     usage:
       "wait [--since N | --cursor-file PATH] [--human] [--actor prefix ...] [--collection items]\n" +
-      "     [--status decided,open] [--id item-id ...] [--op create,update,delete] [--timeout 600 (0 = forever)]",
+      "     [--status decided,open] [--id item-id ...] [--op create,update,delete] [--fleet <id>] [--timeout 600 (0 = forever)]",
     options: {
+      ...fleetOpt,
       since: { type: "string" },
       "cursor-file": { type: "string" },
       human: { type: "boolean" },
@@ -746,6 +846,7 @@ export const COMMANDS = [
       let since = parseIntFlag(v.since, "--since");
       if (since === undefined && cursorFile) since = readCursorFile(cursorFile);
       const timeoutS = parseIntFlag(v.timeout, "--timeout") ?? 600;
+      const fleet = await fleetFilter(ctx);
       const match = changeMatcher({
         human: v.human,
         actors: v.actor,
@@ -755,7 +856,7 @@ export const COMMANDS = [
       });
       const res = await waitForChanges(
         ctx.api,
-        { since, collection: v.collection, match, timeoutMs: timeoutS * 1000 },
+        { since, collection: v.collection, fleet, match, timeoutMs: timeoutS * 1000 },
         { sleep: ctx.sleep, now: ctx.now, log: ctx.log },
       );
       ctx.print(res, (r) => [...r.changes.map(changeLine), r.timed_out ? `timeout cursor ${r.cursor}` : `cursor ${r.cursor}`].join("\n"));
@@ -764,6 +865,27 @@ export const COMMANDS = [
     },
   },
 ];
+
+// /api/state narrowed to one fleet (a person's --fleet, or a token's own): its items and managers, and its own
+// status, lease and hours from the `fleets` map, or the top-level ones when they are that fleet's (a token's
+// own fleet; the default fleet on a server before the registry). archived_total counts the fleet's archived items,
+// which /api/state without ?archived lists in full. Review routines and the `fleets` map stay as they are.
+function stateOfFleet(s, fleet) {
+  const items = s.items.filter((d) => docFleet(d) === fleet);
+  const top = fleet === (fleetOf(s.me) ?? DEFAULT_FLEET) ? { manager: s.manager, lease: s.lease, schedule: s.schedule } : null;
+  const own = (s.fleets && Object.hasOwn(s.fleets, fleet) ? s.fleets[fleet] : undefined) ?? top;
+  if (!own) throw new Error(noFleet(fleet));
+  return {
+    ...s,
+    items,
+    orchestrators: s.orchestrators.filter((d) => docFleet(d) === fleet),
+    manager: own.manager,
+    lease: own.lease,
+    schedule: own.schedule,
+    archived_total: items.filter((d) => d.data?.status === "archived").length,
+    fleet,
+  };
+}
 
 function readCursorFile(path) {
   try {

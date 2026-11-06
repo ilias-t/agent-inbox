@@ -1,6 +1,6 @@
 // agent-inbox CLI entry point. main() never calls process.exit; it returns the
 // exit code so tests can drive it with injected io.
-// Exit codes: 0 ok · 1 error · 2 usage · 3 conflict (any 409) · 4 wait timed out ·
+// Exit codes: 0 ok · 1 error · 2 usage · 3 conflict (any 409; me --expect-fleet on another fleet) · 4 wait timed out ·
 // 5 schedule --check off hours.
 
 import { readFileSync } from "node:fs";
@@ -38,7 +38,8 @@ function globalHelp() {
     "URL is the base including /agent (default http://localhost:8787/agent).",
     "--session/AGENT_INBOX_SESSION: your lease session; writes then carry it (X-Lease-Session) and get",
     "exit 3 lease_held once that session no longer holds the lease.",
-    "--json prints the raw API response. Exit: 0 ok, 1 error, 2 usage, 3 conflict (409; details on stderr),",
+    "--json prints the raw API response. Exit: 0 ok, 1 error, 2 usage, 3 conflict (409; details on stderr) or",
+    "me --expect-fleet on another fleet's token,",
     "4 wait timed out, 5 schedule --check off hours.",
     "`agent-inbox <command> --help` shows a command's flags.",
   ].join("\n");

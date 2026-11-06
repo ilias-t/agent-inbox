@@ -48,9 +48,10 @@ Name manager tokens `orch-<ID>` so `agent-inbox wait --actor token:orch-` can pi
 
 | Command | Does |
 |---|---|
-| `me`, `state` | Who the token is (a human's role too); everything the UI loads |
+| `me [--expect-fleet <id>]`, `state [--fleet <id>]` | Who the token is (a human's role, a token's fleet); everything the UI loads. `--expect-fleet` exits 3 (and says why on stderr) unless the token belongs to that fleet (`default` for the default fleet): an orchestrator's startup check that it was given the right token. A person is in no fleet, so it exits 3 for them too. `state --fleet` keeps one fleet's items and managers, with its own status, lease and hours (`routines`, `fleets`, `cursor` and `archived_more` stay deployment-wide) |
+| `fleets` | Each fleet you can see, with its orchestrator's status: lease holder and heartbeat, last and next tick, work hours (and whether they're inherited). People see every fleet; a token, its own |
 | `users` | People and their roles (`email  role  name`). Read-only: roles are set by an admin in Settings → People, and no token can change them |
-| `items [--status open,decided] [--orchestrator O3] [--qa-pending] [--type T] [--assignee email\|none\|me]` | List items (`me` = your email from `/api/me`; humans only) |
+| `items [--status open,decided] [--orchestrator O3] [--qa-pending] [--type T] [--assignee email\|none\|me] [--fleet <id>]` | List items (`me` = your email from `/api/me`; humans only) |
 | `show <id>`, `qa <id>` | Item with its qa thread; the thread alone |
 | `post <id> [--file item.json\|-] [--type --title --summary --question --context --priority --orchestrator --assignee --source --cost-of-waiting --option id:label[:desc]… --recommend opt[:conf[:why]] --link label=url… --evidence label=url… --decision choice[:note] --set k=v…]` | Create an item (`if_version: 0`); `--if-version N` replaces version N. On a decided or processing item, a replace that changes its status or decision exits 3 `decided` (who decided, when, the choice) unless `--replace-decided` |
 | `patch <id> --set k=v… \| --set k:=json… \| --unset k… \| --file patch.json [--assign email\|me \| --unassign] [--if-version N] [--replace-decided]` | Merge fields (`k:=null` or `--unset k` deletes); `--assign`/`--unassign` set or clear `assignee`. `--replace-decided`: as on `post` |
@@ -65,13 +66,15 @@ Name manager tokens `orch-<ID>` so `agent-inbox wait --actor token:orch-` can pi
 | `digest [<markdown\|->] [--sweep] [--next-tick ISO\|+10m] [--if-version N]` | Stamps `meta/manager.last_pickup` (and `last_tick` with `--sweep`) and `next_tick` (default: the schedule's next pickup); writes the digest only when given |
 | `lease [get]`, `lease acquire --session S [--title] [--holder-url] [--ttl MIN] [--force --if-version N]`, `lease renew --session S [--ttl MIN] [--if-version N]`, `lease release --session S` | Orchestrator lease (`--session` defaults to `$AGENT_INBOX_SESSION`, then `$CLAUDE_SESSION_ID`; TTL defaults server-side to max(25, pickup + 15) min). `--session` on any other write turns on the lease check (above) |
 | `schedule [show] [--cron \| --check]`, `schedule set [--work-hours "10:00-18:00 Mon-Fri"] [--timezone Z] [--pickup 10] [--sweep 30] [--if-version N] [--force]` | Schedule, next pickup and the UTC cron expression(s); `--check` exits 0 in hours, 5 off hours. `set` exits 2 when the stored schedule doesn't validate (the server shows defaults); `--force` writes the defaults plus your flags over it |
-| `changes [--since N] [--wait 0-25] [--collection C]` | One read of the change feed (`C`: `items`, `orchestrators`, `meta`, `qa`, `reviews`) |
+| `changes [--since N] [--wait 0-25] [--collection C] [--fleet <id>]` | One read of the change feed (`C`: `items`, `orchestrators`, `meta`, `qa`, `reviews`) |
 | `reviews start <stamp> [--file run.json\|-]` | A review routine's runner marks a run started (`{started_at?, dry?, log?, model?, next_run_at?}`), so the Reviews tab shows it running. A run that already exists is printed as stored, nothing written. The routine is the token's manager id ([reviews.md](reviews.md)) |
 | `reviews report --file payload.json\|-` | Stores a finished run and its report (`{stamp, result, report, ...}`, [reviews.md](reviews.md)). Exit 0 when stored, and on a replay of the same body (`replayed: true`); 3 when that run is already stored with a different body (the stored run on stderr); 1 when the server refuses the report (the message names the problems) |
 | `reviews [show] [<routine>] [--limit N] [--before STAMP]`, `reviews pr <n> [--routine R]` | A routine's PRs and runs (default: the token's own routine; a token without one, or a human, lists every routine), and one PR with its events |
 | `reviews request [<routine>]` | The routine's newest Run-button request (default: the token's own routine), or `no run request` ([reviews.md](reviews.md#run-requests)). No command makes one: only a human in the browser can |
 | `reviews request-update <id> starting\|started\|skipped\|failed [--stamp STAMP] [--message TEXT]` | The routine's poller reports how a request went: picked up, started (with the run's stamp), skipped (a run was already going) or failed. A retry of the update already made prints the request as stored; any other move exits 3 with it on stderr; 1 (404) when another request replaced it |
-| `wait [--since N \| --cursor-file F] [--human] [--actor prefix…] [--collection C] [--status S] [--id ID…] [--op OPS] [--timeout 600]` | Block until a matching change, print it and the new cursor |
+| `wait [--since N \| --cursor-file F] [--human] [--actor prefix…] [--collection C] [--status S] [--id ID…] [--op OPS] [--fleet <id>] [--timeout 600]` | Block until a matching change, print it and the new cursor |
+
+**Fleets.** A token belongs to one fleet ([api.md](api.md) "Fleets") and sees only that fleet, so the CLI needs no fleet flag for it: its lease, status, hours and items are its own fleet's. `--fleet <id>` (`default` for the default fleet) on `items`, `changes`, `wait` and `state` filters for callers who see every fleet: people, on a local URL without a token. A token that names another fleet there gets exit 1 instead of a filter the server would ignore, and so does a person naming a fleet the server doesn't have, or naming one on a server without the fleet registry (which might ignore the filter); `--fleet default` needs no check. A person is in no fleet, so `me --expect-fleet` exits 3 for them whatever the fleet. A manager token's `fleets` says the lease and status aren't visible to it rather than showing them empty. Against a server from before fleets, every token is the default fleet's, so `me --expect-fleet <named fleet>` exits 3 until the server is upgraded. A fleet without hours of its own shows the deployment's as `[inherited …]` in `schedule`; `schedule set`, or `meta set schedule --set k=v`, gives it its own, starting from the hours it inherits.
 
 ## Values
 
@@ -97,7 +100,7 @@ Sessions started with another `CLAUDE_CONFIG_DIR` (a second account, say) keep t
 | `0` | ok |
 | `1` | error (network, 4xx, 5xx) |
 | `2` | usage |
-| `3` | conflict: any 409 (`conflict`, `not_open`, `not_decided`, `lease_held`), with `{error, message, current}` as JSON on stderr (`batch` adds `index`: the op that failed; nothing was written). `lease_held` on a write that isn't a lease command means `--session`/`AGENT_INBOX_SESSION` no longer holds the lease; it has no `index` on a batch |
+| `3` | `me --expect-fleet` on another fleet's token; conflict: any 409 (`conflict`, `not_open`, `not_decided`, `lease_held`), with `{error, message, current}` as JSON on stderr (`batch` adds `index`: the op that failed; nothing was written). `lease_held` on a write that isn't a lease command means `--session`/`AGENT_INBOX_SESSION` no longer holds the lease; it has no `index` on a batch |
 | `4` | `wait` timed out (stdout still has the cursor) |
 | `5` | `schedule --check` outside work hours |
 
