@@ -326,3 +326,33 @@ describe("the default fleet's lease and status in other fleets' feeds", () => {
     expect((await D.get(`/api/changes?since=${c0}`)).body.changes.map((r: any) => r.doc_id)).toEqual(["lease", "lease", "manager"]);
   });
 });
+
+describe("where a fleet may be named", () => {
+  it("DELETE /api/schedule takes the body's fleet, refuses two different ones, and a token's other fleet is 403", async () => {
+    const shared = (await human.get("/api/schedule")).body.schedule;
+    await human.put("/api/schedule?fleet=fa", { schedule: shared });
+    await human.put("/api/schedule?fleet=fb", { schedule: shared });
+    expect((await call("DELETE", "/api/schedule?fleet=fa", { body: { fleet: "fb" } })).status).toBe(400);
+    expect((await B.get("/api/schedule")).body.inherited).toBeUndefined();
+    expect((await A.get("/api/schedule")).body.inherited).toBeUndefined();
+    expect((await call("DELETE", "/api/schedule", { body: { fleet: "fb" } })).body.inherited).toBe(true);
+    expect((await call("DELETE", "/agent/api/schedule", { token: aSecret, host: "inbox.test", body: { fleet: "fb" } })).status).toBe(403);
+    expect((await A.get("/api/schedule")).body.inherited).toBeUndefined();
+    await A.del("/api/schedule");
+    expect((await A.del("/api/schedule?if_version=0")).status).toBe(409);
+  });
+
+  it("/api/meta takes the fleet only in the id: ?fleet= or a body or batch fleet is 400", async () => {
+    expect((await human.put("/api/meta/schedule?fleet=fb", { data: {} })).status).toBe(400);
+    expect((await human.patch("/api/meta/manager", { data: { note: "x" }, fleet: "fb" })).status).toBe(400);
+    expect((await human.get("/api/meta/manager?fleet=fb")).status).toBe(400);
+    const r = await human.post("/api/batch", { ops: [{ op: "meta.put", id: "manager", fleet: "fb", data: { note: "x" } }] });
+    expect([r.status, r.body.index]).toEqual([400, 0]);
+  });
+
+  it("a manager token's other fleet is 403 on the schedule too", async () => {
+    const mgr = agent((await mintFleetToken("fa", "orchestrator", uid("I"))).secret);
+    expect((await mgr.get("/api/schedule?fleet=fb")).status).toBe(403);
+    expect((await mgr.get("/api/schedule")).status).toBe(200);
+  });
+});

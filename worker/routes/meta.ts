@@ -17,8 +17,17 @@ import { metaFleet, metaId, requireMetaFleet, resolveMetaId, targetFleet } from 
 
 const PEOPLE_ONLY = "meta/people was replaced by the users table: use /api/people/me and /api/users";
 
+// A fleet's meta doc is named in its id (`meta/manager:<fleet>`; a token's bare id is its own fleet's), never by
+// a separate fleet: one there would otherwise be ignored, and the call land on the default fleet's doc.
+function refuseFleetParam(c: Ctx, body?: Record<string, unknown>): void {
+  if (c.url.searchParams.has("fleet") || (body && body.fleet !== undefined)) {
+    throw badRequest("Name a fleet's meta doc in its id (meta/<id>:<fleet>), not with fleet");
+  }
+}
+
 async function get(c: Ctx): Promise<Response> {
   requireFull(c.caller);
+  refuseFleetParam(c);
   if (c.params.id === "people") throw badRequest(PEOPLE_ONLY);
   const id = resolveMetaId(c.caller, c.params.id);
   requireMetaFleet(c.caller, id);
@@ -30,6 +39,7 @@ async function get(c: Ctx): Promise<Response> {
 function metaOp(mode: "put" | "patch"): OpBuilder {
   return (c, asked, body): WriteOp<Record<string, unknown>> => {
     requireFull(c.caller);
+    refuseFleetParam(c, body);
     const id = resolveMetaId(c.caller, asked);
     const perFleet = metaFleet(id);
     if (id === "lease" || perFleet?.base === "lease") throw badRequest(`meta/${id} is written through /api/lease`);
@@ -60,11 +70,12 @@ export const patchMetaOp = metaOp("patch");
 async function tickRequest(c: Ctx): Promise<Response> {
   requireFullRole(c.caller, "decider");
   const body = await c.body();
+  const fleet = targetFleet(c, body); // before the note: another fleet's is 403 whatever it says
   const note = optString(body, "note", 2000);
   const { doc } = await mutate<ManagerMeta>(
     c.env.DB,
     "meta",
-    metaId("manager", targetFleet(c, body)),
+    metaId("manager", fleet),
     { actor: c.caller.actor, now: c.now },
     (cur) => ({ ...(cur?.data ?? {}), tick_requested_at: c.now, tick_requested_note: note || null }),
   );

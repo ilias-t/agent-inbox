@@ -81,12 +81,12 @@ async function put(c: Ctx): Promise<Response> {
 // The default fleet's schedule is the deployment's, which stays.
 async function del(c: Ctx): Promise<Response> {
   requireFullAdmin(c.caller);
-  const fleet = scheduleFleet(c);
+  const fleet = scheduleFleet(c, await c.body());
   if (fleet === null) throw badRequest("The default fleet's schedule is the deployment's: replace it with PUT, it can't be removed");
   const pin = ifVersion(c.url.searchParams.get("if_version"));
   const r = await deleteDoc(c.env.DB, "meta", metaId("schedule", fleet), { version: pin });
   // Nothing to drop is fine, unless the caller pinned a version it read: then that doc is gone already.
-  if (r === "missing" && pin) throw conflict("conflict", `No meta/${metaId("schedule", fleet)} at version ${pin}: it was dropped already`, null);
+  if (r === "missing" && pin !== undefined) throw conflict("conflict", `No meta/${metaId("schedule", fleet)} at version ${pin}: it was dropped already`, null);
   return json(await fleetSchedule(c.env.DB, fleet));
 }
 
