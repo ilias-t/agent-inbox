@@ -55,7 +55,7 @@ test("An admin adds a fleet and mints an orchestrator token for it", async ({ pa
   await expect(fleets).toContainText("manager ids S1, S2");
 
   // Edit keeps the id and changes the label.
-  await fleets.getByRole("button", { name: "Edit" }).last().click();
+  await fleets.locator(".tokrow", { hasText: id }).getByRole("button", { name: "Edit" }).click();
   await expect(fleets.getByLabel("Id", { exact: true })).toHaveValue(id);
   await fleets.getByLabel("Label").fill("Side project A");
   await fleets.getByRole("button", { name: "Save fleet" }).click();

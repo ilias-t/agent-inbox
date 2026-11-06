@@ -151,6 +151,9 @@ describe("mergeDelta: a delta applied to the /api/state the client holds", () =>
       const s = snapshot({ fleets: { default: entry("D") } as StateResponse["fleets"] });
       expect(() => mergeDelta(s, delta({ fleets: { fb: { lease: null } } }))).toThrow(DeltaMismatch);
       expect(Object.keys(mergeDelta(s, delta({ fleets: { fb: entry("B") } as StateDelta["fleets"] })).fleets!)).toEqual(["default", "fb"]);
+      for (const bad of [null, 3, { fa: null }, { fa: "x" }]) {
+        expect(() => mergeDelta(s, { ...delta(), fleets: bad } as unknown as StateDelta)).toThrow(DeltaMismatch);
+      }
     });
   });
 });

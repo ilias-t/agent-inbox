@@ -46,7 +46,8 @@ async function get(c: Ctx): Promise<Response> {
 // A token creating a manager doc can't take an id another fleet owns through a review routine or a live manager token
 // (docs/api.md "Fleets": manager ids stay global; minting reads the same owners). A read, not part of the write: a
 // mint racing this create can at worst leave a token whose writes its doc refuses, never one that reaches another
-// fleet.
+// fleet. Stricter than the mint's order of owners on purpose: any holder in another fleet refuses (after an admin
+// move, revoke the old fleet's token first).
 async function requireIdFree(c: Ctx, id: string): Promise<void> {
   const own = fleetScope(c.caller);
   if (own === undefined) return;

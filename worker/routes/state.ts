@@ -39,18 +39,16 @@ export const FLEETS_SQL = `SELECT ${COLS} FROM docs WHERE collection = 'fleets'
     OR id GLOB 'manager:*' OR id GLOB 'lease:*' OR id GLOB 'schedule:*')`;
 
 // /api/state `fleets` (docs/api.md "Session"), from FLEETS_SQL's rows: `default` and every registered fleet, each
-// with its own status, lease and schedule view, as its orchestrator token sees them. With `only`, just those fleets
-// (the delta's changed ones; ids that aren't registered are left out).
-export function fleetsMap(rows: DocRow[], now: Date, only?: Iterable<string>): Record<string, FleetState> {
+// with its own status, lease and schedule view, as its orchestrator token sees them. The delta picks parts of it.
+export function fleetsMap(rows: DocRow[], now: Date): Record<string, FleetState> {
   const docs = new Map(rows.map((r) => [`${r.collection}\u0000${r.id}`, r]));
   const doc = <T,>(collection: string, id: string) => {
     const row = docs.get(`${collection}\u0000${id}`);
     return row ? toDoc<T>(row) : null;
   };
   const registered = new Set([DEFAULT_FLEET, ...rows.filter((r) => r.collection === "fleets").map((r) => r.id)]);
-  const ids = only === undefined ? [...registered] : [...new Set(only)].filter((id) => registered.has(id));
   const out: Record<string, FleetState> = {};
-  for (const id of ids.sort()) {
+  for (const id of [...registered].sort()) {
     const f = id === DEFAULT_FLEET ? null : id;
     out[id] = {
       doc: doc<Fleet>("fleets", id),

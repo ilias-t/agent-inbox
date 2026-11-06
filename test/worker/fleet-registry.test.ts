@@ -169,6 +169,14 @@ describe("minting a token for a fleet", () => {
     const R = uid("routine");
     await env.DB.prepare("INSERT INTO review_routines (routine, version, updated_at, fleet) VALUES (?, 1, 'x', 'fb')").bind(R).run();
     expect((await A.put(`/api/orchestrators/${R}`, { data: { goal: "take" } })).status).toBe(403);
+    // The default fleet's token is held off another fleet's id too, and a default-fleet holder holds it off others.
+    const T = uid("held-d");
+    expect((await mint({ scope: "orchestrator", orchestrator: T, fleet: "fb" })).status).toBe(201);
+    expect((await D.put(`/api/orchestrators/${T}`, { data: { goal: "take" } })).status).toBe(403);
+    const U = uid("routine-d");
+    await env.DB.prepare("INSERT INTO review_routines (routine, version, updated_at) VALUES (?, 1, 'x')").bind(U).run();
+    expect((await A.put(`/api/orchestrators/${U}`, { data: { goal: "take" } })).status).toBe(403);
+    expect((await D.put(`/api/orchestrators/${U}`, { data: { goal: "mine" } })).status).toBe(201);
     // Its own fleet's token may, and so may a person.
     const B = agent((await mintFleetToken("fb")).secret);
     expect((await B.put(`/api/orchestrators/${O}`, { data: { goal: "mine" } })).status).toBe(201);
