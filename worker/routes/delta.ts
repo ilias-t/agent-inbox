@@ -14,13 +14,13 @@ import type {
   StateDeltaReset,
 } from "../../shared/types.ts";
 import { fleetScope, orchestratorScope } from "../auth.ts";
-import { fleetChangesSql } from "../fleets.ts";
+import { fleetChangesSql, metaId } from "../fleets.ts";
 import { badRequest, json } from "../http.ts";
 import type { Ctx, Route } from "../router.ts";
 import { COLS, toDoc, type DocRow } from "../store.ts";
 import { routinesSql } from "../reviews.ts";
 import { toPerson } from "../users.ts";
-import { scheduleView } from "./schedule.ts";
+import { fleetScheduleView } from "./schedule.ts";
 import { PINS_SQL, pinMap, routineState } from "./state.ts";
 
 // At most this many change rows after `since`; further behind, a full /api/state is the cheaper read.
@@ -60,7 +60,7 @@ function head(view: View): string {
   // isn't its business.
   const scope =
     view === "manager"
-      ? `AND ((orchestrator = ?2 AND +fleet IS ?6) OR (collection = 'meta' AND doc_id = 'schedule')
+      ? `AND ((orchestrator = ?2 AND +fleet IS ?6) OR (collection = 'meta' AND doc_id IN ('schedule', 'schedule:' || ?6))
          OR (collection = 'items' AND +fleet IS ?6 AND doc_id IN (SELECT doc_id FROM changes WHERE orchestrator = ?2 AND +fleet IS ?6 AND collection = 'items')))`
       : view === "fleet" || view === "named"
         ? `AND ${fleetChangesSql(view === "named", "?6")}`
@@ -99,15 +99,19 @@ function archivedMayChange(view: View): string {
 }
 
 // The docs /api/state would show the caller, of `d`.
+// Meta docs come from their own statement (META_SQL).
 function visibleDocs(view: View): string {
   if (view === "manager") {
     return `(d.collection = 'items' AND d.orchestrator = ?2 AND d.fleet IS ?6)
-       OR (d.collection = 'orchestrators' AND d.id = ?2 AND d.fleet IS ?6)
-       OR (d.collection = 'meta' AND d.id = 'schedule')`;
+       OR (d.collection = 'orchestrators' AND d.id = ?2 AND d.fleet IS ?6)`;
   }
-  const docs = view === "all" ? "d.collection IN ('items', 'orchestrators')" : "(d.collection IN ('items', 'orchestrators') AND d.fleet IS ?6)";
-  return `${docs} OR (d.collection = 'meta' AND d.id IN ('manager', 'lease', 'schedule'))`;
+  return view === "all" ? "d.collection IN ('items', 'orchestrators')" : "d.collection IN ('items', 'orchestrators') AND d.fleet IS ?6";
 }
+
+// The caller's fleet's manager, lease and schedule docs (?6: null for a person, the default fleet), and the
+// deployment's schedule, which a named fleet without hours of its own falls back on. Two to four primary-key reads.
+const META_SQL = `SELECT ${COLS} FROM docs WHERE collection = 'meta'
+  AND id IN (coalesce('manager:' || ?6, 'manager'), coalesce('lease:' || ?6, 'lease'), 'schedule', 'schedule:' || ?6)`;
 
 const D_COLS = COLS.split(", ").map((col) => `d.${col}`).join(", ");
 
@@ -125,7 +129,7 @@ async function delta(c: Ctx): Promise<Response> {
   // `+fleet` beside orchestrator keeps a manager token's count on docs_orchestrator (its few items).
   const own = view === "manager" ? " AND orchestrator = ?2 AND +fleet IS ?6" : view === "all" ? "" : " AND fleet IS ?6";
 
-  const [top, keys, docs, users, snoozes, pins, routines] = await db.batch<any>([
+  const [top, keys, docs, users, snoozes, pins, routines, meta] = await db.batch<any>([
     stmt(`SELECT head.cursor, ok.ok,
       CASE WHEN ${archivedMayChange(view)}
         THEN (SELECT count(*) FROM docs WHERE collection = 'items' AND status = 'archived'${own}) END AS archived
@@ -143,7 +147,13 @@ async function delta(c: Ctx): Promise<Response> {
     stmt(`SELECT * FROM (${PINS_SQL.replace("?1", "?4")}) WHERE EXISTS (SELECT 1 FROM ch WHERE collection = 'pins')`),
     // Review routines, as /api/state lists them, when one changed (its head's change row is in ch).
     stmt(`SELECT * FROM (${routinesSql("?2", view === "all" ? undefined : "?6")}) WHERE EXISTS (SELECT 1 FROM ch WHERE collection = 'reviews') ORDER BY id`),
+    // The caller's meta docs, when one of them is in ch.
+    stmt(`${META_SQL} AND EXISTS (SELECT 1 FROM ch WHERE collection = 'meta')`),
   ]);
+  // The ids this caller's manager, lease and schedule have (a person's: the default fleet's).
+  const mine = fleet ?? null;
+  const ids = { manager: metaId("manager", mine), lease: metaId("lease", mine), schedule: metaId("schedule", mine) };
+  const metaRow = (id: string) => (meta.results as DocRow[]).find((r) => r.id === id) ?? null;
   const { cursor, ok, archived } = top.results[0] as { cursor: number; ok: number; archived: number | null };
   if (!ok) return json({ reset: true } satisfies StateDeltaReset);
 
@@ -169,11 +179,17 @@ async function delta(c: Ctx): Promise<Response> {
     } else if (collection.startsWith("items/") && collection.endsWith("/qa")) {
       qa.add(collection.slice("items/".length, -"/qa".length));
     } else if (collection === "meta") {
-      const row = found("meta", id);
       // Tokens scoped to an orchestrator get manager and lease as null in /api/state, and no rows for them here.
-      if (id === "manager") body.manager = row && toDoc<ManagerMeta>(row);
-      else if (id === "lease") body.lease = row && toDoc<Lease>(row);
-      else if (id === "schedule") body.schedule = scheduleView(row && toDoc<Schedule>(row));
+      const row = metaRow(id);
+      if (view !== "manager" && id === ids.manager) body.manager = row && toDoc<ManagerMeta>(row);
+      else if (view !== "manager" && id === ids.lease) body.lease = row && toDoc<Lease>(row);
+      else if (id === "schedule" || id === ids.schedule) {
+        const doc = (i: string) => {
+          const r = metaRow(i);
+          return r ? toDoc<Schedule>(r) : null;
+        };
+        body.schedule = fleetScheduleView(mine, mine === null ? null : doc(ids.schedule), doc("schedule"));
+      }
     } else if (collection === "users") {
       body.people = view === "manager" ? [] : users.results.map(toPerson);
     } else if (collection === "reviews") {

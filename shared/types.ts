@@ -154,8 +154,12 @@ export const DEFAULT_SCHEDULE: Schedule = {
 
 export interface ScheduleView {
   schedule: Schedule;
-  version: number | null; // null while meta/schedule has never been written (defaults)
+  version: number | null; // null while meta/schedule has never been written (defaults), or while a fleet inherits
   stored_invalid?: true; // meta/schedule exists but doesn't validate; `schedule` is the defaults
+  // A named fleet without hours of its own: `schedule` is the deployment's, `version` its own doc's (null), and
+  // inherited_version the deployment's doc's (null: never written), which moves when those hours change.
+  inherited?: true;
+  inherited_version?: number | null;
   computed: {
     now: string;
     in_hours: boolean;

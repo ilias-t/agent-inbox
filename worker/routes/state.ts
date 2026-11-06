@@ -7,7 +7,8 @@ import type { Ctx, Route } from "../router.ts";
 import { COLS, toDoc, type DocRow } from "../store.ts";
 import { routinesSql } from "../reviews.ts";
 import { toPerson, type UserRow } from "../users.ts";
-import { scheduleView } from "./schedule.ts";
+import { metaId } from "../fleets.ts";
+import { fleetScheduleView } from "./schedule.ts";
 
 async function me(c: Ctx): Promise<Response> {
   return json(c.caller.principal);
@@ -39,6 +40,7 @@ async function state(c: Ctx): Promise<Response> {
   const scope = orchestratorScope(c.caller);
   // A token sees its own fleet (docs/api.md "Fleets"); a manager token, its own items and doc in it.
   const fleet = fleetScope(c.caller);
+  const home = fleet ?? null; // the fleet whose manager, lease and schedule the caller gets (a person's: the default)
   const limit = archivedLimit(c);
   const sel = (where: string, ...binds: unknown[]) =>
     db.prepare(`SELECT ${COLS} FROM docs WHERE ${where} ORDER BY created_at, id`).bind(...binds);
@@ -69,7 +71,9 @@ async function state(c: Ctx): Promise<Response> {
     scope === null
       ? sel("collection = 'orchestrators'" + inFleet, ...fleetBinds)
       : sel("collection = 'orchestrators' AND id = ?" + inFleet, scope, ...fleetBinds),
-    sel("collection = 'meta' AND id IN ('manager', 'lease', 'schedule')"),
+    // The caller's fleet's manager, lease and schedule (a person's: the default fleet's), and the deployment's
+    // schedule, which a named fleet without hours of its own falls back on.
+    sel("collection = 'meta' AND id IN (?, ?, ?, 'schedule')", metaId("manager", home), metaId("lease", home), metaId("schedule", home)),
     // Orchestrator tokens see no people.
     db.prepare("SELECT email, name, ntfy_topic FROM users WHERE ?1 ORDER BY email").bind(scope === null ? 1 : 0),
     // The caller's own snoozes still to come (migration 0007); tokens have none.
@@ -94,9 +98,9 @@ async function state(c: Ctx): Promise<Response> {
     items: itemDocs.map((r) => toDoc<Item>(r)),
     orchestrators: orchs.results.map((r) => toDoc<Orchestrator>(r)),
     // Orchestrator tokens can't read meta docs, so they get nulls here too.
-    manager: scope === null ? metaDoc<ManagerMeta>("manager") : null,
-    lease: scope === null ? metaDoc<Lease>("lease") : null,
-    schedule: scheduleView(metaDoc<Schedule>("schedule")),
+    manager: scope === null ? metaDoc<ManagerMeta>(metaId("manager", home)) : null,
+    lease: scope === null ? metaDoc<Lease>(metaId("lease", home)) : null,
+    schedule: fleetScheduleView(home, home === null ? null : metaDoc<Schedule>(metaId("schedule", home)), metaDoc<Schedule>("schedule")),
     cursor: cursor.results[0].seq,
     me: c.caller.principal,
     people: users.results.map(toPerson),
