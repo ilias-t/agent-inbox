@@ -422,9 +422,11 @@ describe("per-fleet meta docs", () => {
       await A.put("/api/meta/manager:fb", { data: { note: "x" } }),
       await A.get("/api/meta/manager:fb"),
       await D.put("/api/meta/schedule:fa", { data: {} }),
-      await A.put("/api/meta/manager:default", { data: { note: "x" } }),
     ];
-    expect(refused.map((r) => r.status)).toEqual([403, 403, 403, 403]);
+    expect(refused.map((r) => r.status)).toEqual([403, 403, 403]);
+    // `<base>:default` names no doc: the default fleet's is the bare id.
+    expect((await A.put("/api/meta/manager:default", { data: { note: "x" } })).status).toBe(400);
+    expect((await human.put("/api/meta/manager:default", { data: { note: "x" } })).status).toBe(400);
     expect((await A.put("/api/meta/manager:fa", { data: { note: "mine" } })).status).toBeLessThan(300);
     expect((await A.put("/api/meta/lease:fa", { data: {} })).status).toBe(400);
     expect((await human.put("/api/meta/lease:fa", { data: {} })).status).toBe(400);
@@ -444,5 +446,36 @@ describe("archived_total across moves", () => {
         expect((await c.get(`/api/state/delta?since=${c0}`)).body.archived_total, to).toBe((await c.get("/api/state")).body.archived_total);
       }
     }
+  });
+});
+
+describe("filters and pages", () => {
+  it("a named fleet's change feed takes a collection filter, and people's bad ?fleet= is 400", async () => {
+    const c0 = await cursorNow();
+    const id = uid("fa-coll");
+    await A.put(`/api/items/${id}`, { data: { type: "info", title: "a" } });
+    await human.put("/api/meta/fleet-coll-note", { data: { x: 1 } });
+    const of = async (q: string) => (await A.get(`/api/changes?since=${c0}${q}`)).body.changes.map((r: any) => `${r.collection}/${r.doc_id}`);
+    expect(await of("&collection=items")).toEqual([`items/${id}`]);
+    expect(await of("&collection=meta")).toEqual(["meta/fleet-coll-note"]);
+    expect(await of("")).toEqual([`items/${id}`, "meta/fleet-coll-note"]);
+    expect((await human.get("/api/changes?since=0&fleet=Nope")).status).toBe(400);
+    expect((await human.get("/api/items?fleet=*")).status).toBe(400);
+    expect((await human.get("/api/changes?since=0&collection=constructor")).status).toBe(400);
+  });
+
+  it("pages a fleet token's items within its fleet", async () => {
+    for (let i = 0; i < 3; i++) await A.put(`/api/items/${uid("fa-page")}`, { data: { type: "info", title: "p" } });
+    const seen: string[] = [];
+    let q = "/api/items?limit=2";
+    for (;;) {
+      const r = (await A.get(q)).body;
+      seen.push(...r.items.map((d: any) => d.id));
+      expect(r.items.every((d: any) => d.data.fleet === "fa")).toBe(true);
+      if (!r.more) break;
+      const last = r.items[r.items.length - 1];
+      q = `/api/items?limit=2&before=${encodeURIComponent(last.updated_at)}&before_id=${encodeURIComponent(last.id)}`;
+    }
+    expect(seen).toEqual(ids((await human.get("/api/items?fleet=fa&limit=200")).body.items));
   });
 });

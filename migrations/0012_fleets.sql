@@ -19,8 +19,11 @@
 -- reads as belonging to that fleet from now on. Check before applying:
 --   SELECT collection, id FROM docs WHERE json_extract(data, '$.fleet') IS NOT NULL;
 --
--- Rolling back, in this order (SQLite refuses to drop a column an index or a
--- trigger names; test/worker/migration-fleets.test.ts runs exactly this):
+-- Rolling back: roll the Worker back first (`wrangler rollback`); this Worker
+-- reads tokens.fleet, so dropping it under a live one fails every bearer call.
+-- The schema can stay: it is additive, and an older Worker never names it.
+-- To take it out too, in this order (SQLite refuses to drop a column an index
+-- or a trigger names; test/worker/migration-fleets.test.ts runs exactly this):
 --   DROP INDEX docs_fleet; DROP INDEX changes_fleet; DROP INDEX changes_shared;
 --   DROP TRIGGER docs_ai; DROP TRIGGER docs_au; DROP TRIGGER docs_ad;
 --   DROP TRIGGER review_routines_ai; DROP TRIGGER review_routines_au; DROP TRIGGER review_routines_ad;

@@ -55,7 +55,7 @@ async function changes(c: Ctx): Promise<Response> {
   if (since === undefined) return json({ cursor: await latestSeq(db), changes: [] });
   const wait = Math.min(intParam(q.get("wait"), "wait") ?? 0, WAIT_MAX_S);
   const collection = q.get("collection");
-  if (collection && !(collection in COLLECTION_FILTERS)) {
+  if (collection && !Object.hasOwn(COLLECTION_FILTERS, collection)) {
     throw badRequest(`collection must be one of ${Object.keys(COLLECTION_FILTERS).join(", ")}`);
   }
   const scope = orchestratorScope(c.caller);
@@ -66,11 +66,15 @@ async function changes(c: Ctx): Promise<Response> {
   // A named fleet's rows are two index ranges, its own (changes_fleet) and the shared ones (changes_shared), each
   // read in order up to a page and then merged: one OR over both would scan every default-fleet row after the
   // cursor on each poll of an idle fleet.
+  // A collection filter that no shared row can match skips that range.
+  const shared = !collection || collection === "meta";
   const sql =
     fleet && scope === null
-      ? `SELECT * FROM (SELECT ${cols} FROM changes WHERE seq > ?2 AND fleet = ?4 ${tail})
-         UNION ALL SELECT * FROM (SELECT ${cols} FROM changes INDEXED BY changes_shared WHERE seq > ?2 AND ${SHARED_CHANGES} ${tail})
-         ORDER BY seq LIMIT ${PAGE}`
+      ? shared
+        ? `SELECT * FROM (SELECT ${cols} FROM changes WHERE seq > ?2 AND fleet = ?4 ${tail})
+           UNION ALL SELECT * FROM (SELECT ${cols} FROM changes INDEXED BY changes_shared WHERE seq > ?2 AND ${SHARED_CHANGES} ${tail})
+           ORDER BY seq LIMIT ${PAGE}`
+        : `SELECT ${cols} FROM changes WHERE seq > ?2 AND fleet = ?4 ${tail}`
       : `SELECT ${cols} FROM changes
          WHERE seq > ?2 ${scope !== null ? SCOPE_FILTER : ""} ${fleetSql} ${tail}`;
   const p = c.caller.principal;

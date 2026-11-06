@@ -105,8 +105,10 @@ export function metaFleet(id: string): { base: string; fleet: string | null } | 
   return m ? { base: m[1], fleet: m[2] === DEFAULT_FLEET ? null : m[2] } : undefined;
 }
 
-// A token reads and writes another fleet's per-fleet meta doc never: 403.
+// A token reads and writes another fleet's per-fleet meta doc never: 403. `<base>:default` is no id at all (the
+// default fleet's is the bare `<base>`), so it is 400 for everyone.
 export function requireMetaFleet(c: Caller, id: string): void {
   const own = fleetScope(c), named = metaFleet(id);
+  if (named && named.fleet === null) throw badRequest(`The default fleet's is meta/${named.base}`);
   if (own !== undefined && named && named.fleet !== own) throw forbidden(`meta/${id} belongs to another fleet`);
 }
