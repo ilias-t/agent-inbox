@@ -14,19 +14,28 @@
 -- it never sees the new ones; its writes log through the new triggers with
 -- fleet NULL, the default fleet, which is what it writes.
 --
--- Rolling back, in this order (SQLite refuses to drop an indexed column):
+-- One assumption about existing data: no item or manager doc already has a
+-- `fleet` key in its data (items keep unknown extra fields). One that does
+-- reads as belonging to that fleet from now on. Check before applying:
+--   SELECT collection, id FROM docs WHERE json_extract(data, '$.fleet') IS NOT NULL;
+--
+-- Rolling back, in this order (SQLite refuses to drop a column an index or a
+-- trigger names):
 --   DROP INDEX docs_fleet; DROP INDEX changes_fleet;
---   recreate docs_ai, docs_au, docs_ad as 0002 has them, and
---   review_routines_ai, _au, _ad as 0009 has them;
+--   DROP TRIGGER docs_ai, docs_au, docs_ad, review_routines_ai, _au, _ad, then
+--   create docs_* again as 0002 has them and review_routines_* as 0009 has them;
 --   ALTER TABLE docs DROP COLUMN fleet; ALTER TABLE changes DROP COLUMN fleet;
 --   ALTER TABLE tokens DROP COLUMN fleet; ALTER TABLE review_routines DROP COLUMN fleet.
--- Roll the Worker back before a token bound to a named fleet exists, or revoke
--- those tokens first: a Worker from before fleets doesn't read tokens.fleet,
--- so it would treat them as unscoped.
+-- A Worker from before fleets doesn't read tokens.fleet, so under it every
+-- token reads and writes every fleet again. Roll the Worker back only while no
+-- named fleet is in use; once one is, revoke every token you don't trust with
+-- every fleet's data first.
 
--- A query column and index, as assignee (0003).
+-- A query column, as assignee (0003). Its index leads with the fleet and then
+-- serves a fleet's reads as docs_status_updated (0006) serves everyone's: its
+-- items by status, the archived count, and archived pages newest first.
 ALTER TABLE docs ADD COLUMN fleet TEXT GENERATED ALWAYS AS (json_extract(data, '$.fleet')) VIRTUAL;
-CREATE INDEX docs_fleet ON docs (collection, fleet);
+CREATE INDEX docs_fleet ON docs (collection, fleet, status, updated_at, id);
 
 ALTER TABLE tokens ADD COLUMN fleet TEXT;              -- NULL: the default fleet
 ALTER TABLE review_routines ADD COLUMN fleet TEXT;     -- the fleet of the token that first wrote it
@@ -35,10 +44,16 @@ ALTER TABLE changes ADD COLUMN fleet TEXT;
 CREATE INDEX changes_fleet ON changes (fleet, seq);
 
 -- 0002's triggers plus the fleet each change belongs to, at write time: an
--- item's or manager doc's own fleet, a qa message's parent item's fleet, a
--- meta doc's `:<fleet>` suffix (`manager:<fleet>`), and a fleet doc's own id
--- (the default fleet's doc, `fleets/default`, logs as the default fleet).
--- Every other collection logs NULL, as before.
+-- item's or manager doc's own fleet, a qa message's parent item's fleet, the
+-- fleet a per-fleet meta doc names (`manager:<fleet>`, `lease:<fleet>`,
+-- `schedule:<fleet>`; any other meta id is shared), and a fleet doc's own id
+-- (the default fleet's, `fleets/default`, logs as the default fleet). Every
+-- other row logs NULL, as before.
+--
+-- An update that moves an item or manager doc to another fleet (an admin's)
+-- logs one more row first, under the fleet it left, so that fleet's feed
+-- wakes and its delta drops the doc. It carries no status: the doc isn't that
+-- fleet's to read any more.
 DROP TRIGGER docs_ai;
 DROP TRIGGER docs_au;
 DROP TRIGGER docs_ad;
@@ -59,12 +74,17 @@ CREATE TRIGGER docs_ai AFTER INSERT ON docs BEGIN
       WHEN NEW.collection LIKE 'items/%/qa' THEN
         (SELECT d.fleet FROM docs d WHERE d.collection = 'items'
            AND d.id = substr(NEW.collection, 7, length(NEW.collection) - 9))
-      WHEN NEW.collection = 'meta' AND instr(NEW.id, ':') > 0 THEN substr(NEW.id, instr(NEW.id, ':') + 1)
+      WHEN NEW.collection = 'meta' AND (NEW.id GLOB 'manager:*' OR NEW.id GLOB 'lease:*' OR NEW.id GLOB 'schedule:*')
+        THEN nullif(substr(NEW.id, instr(NEW.id, ':') + 1), 'default')
       WHEN NEW.collection = 'fleets' THEN nullif(NEW.id, 'default')
     END);
 END;
 
 CREATE TRIGGER docs_au AFTER UPDATE ON docs BEGIN
+  INSERT INTO changes (collection, doc_id, op, version, status, actor, at, orchestrator, fleet)
+  SELECT NEW.collection, NEW.id, 'update', NEW.version, NULL, NEW.updated_by, NEW.updated_at,
+    CASE WHEN NEW.collection = 'items' THEN OLD.orchestrator ELSE NEW.id END, OLD.fleet
+  WHERE NEW.collection IN ('items', 'orchestrators') AND OLD.fleet IS NOT NEW.fleet;
   INSERT INTO changes (collection, doc_id, op, version, status, actor, at, orchestrator, fleet)
   VALUES (NEW.collection, NEW.id, 'update', NEW.version, NEW.status, NEW.updated_by, NEW.updated_at,
     CASE
@@ -79,7 +99,8 @@ CREATE TRIGGER docs_au AFTER UPDATE ON docs BEGIN
       WHEN NEW.collection LIKE 'items/%/qa' THEN
         (SELECT d.fleet FROM docs d WHERE d.collection = 'items'
            AND d.id = substr(NEW.collection, 7, length(NEW.collection) - 9))
-      WHEN NEW.collection = 'meta' AND instr(NEW.id, ':') > 0 THEN substr(NEW.id, instr(NEW.id, ':') + 1)
+      WHEN NEW.collection = 'meta' AND (NEW.id GLOB 'manager:*' OR NEW.id GLOB 'lease:*' OR NEW.id GLOB 'schedule:*')
+        THEN nullif(substr(NEW.id, instr(NEW.id, ':') + 1), 'default')
       WHEN NEW.collection = 'fleets' THEN nullif(NEW.id, 'default')
     END);
 END;
@@ -100,7 +121,8 @@ CREATE TRIGGER docs_ad AFTER DELETE ON docs BEGIN
       WHEN OLD.collection LIKE 'items/%/qa' THEN
         (SELECT d.fleet FROM docs d WHERE d.collection = 'items'
            AND d.id = substr(OLD.collection, 7, length(OLD.collection) - 9))
-      WHEN OLD.collection = 'meta' AND instr(OLD.id, ':') > 0 THEN substr(OLD.id, instr(OLD.id, ':') + 1)
+      WHEN OLD.collection = 'meta' AND (OLD.id GLOB 'manager:*' OR OLD.id GLOB 'lease:*' OR OLD.id GLOB 'schedule:*')
+        THEN nullif(substr(OLD.id, instr(OLD.id, ':') + 1), 'default')
       WHEN OLD.collection = 'fleets' THEN nullif(OLD.id, 'default')
     END);
 END;

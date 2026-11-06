@@ -32,9 +32,9 @@ function sinceParam(c: Ctx): number {
   return Number(raw);
 }
 
-// Whose view: a human's (every fleet), a fleet's orchestrator token's (its fleet, docs/api.md "Fleets"), or a
-// manager token's (its own items and doc, in its fleet).
-type View = "all" | "fleet" | "manager";
+// Whose view: a human's (every fleet), a fleet's orchestrator token's (the default fleet's, or a named one's;
+// docs/api.md "Fleets"), or a manager token's (its own items and doc, in its fleet).
+type View = "all" | "fleet" | "named" | "manager";
 
 // The shared head of every statement in the batch, which binds the same six parameters to each (`p` only
 // names them all, so every statement takes six): ?1 since, ?2 the orchestrator scope ('' for none), ?3 the
@@ -53,15 +53,15 @@ function head(view: View): string {
   // logged under the new orchestrator, or moved to another fleet), so the item leaves its state as it would on
   // a refetch. Only ids it already knew come back that way, as deletes.
   //
-  // A fleet's token: as /api/changes (FLEET_FILTER there), plus later changes to an item or manager doc that
-  // was in its fleet (an admin moved it out), found per changed doc through changes_doc, for the same reason.
+  // A fleet's token: as /api/changes (FLEET_FILTER there). A doc an admin moved out of its fleet comes with
+  // the rest: the move logs a row under the fleet it left (migration 0012), which the doc fails visibleDocs on.
+  // `+fleet` keeps a manager token's rows on changes_orchestrator.
   const scope =
     view === "manager"
-      ? `AND ((orchestrator = ?2 AND fleet IS ?6) OR (collection = 'meta' AND doc_id = 'schedule')
-         OR (collection = 'items' AND doc_id IN (SELECT doc_id FROM changes WHERE orchestrator = ?2 AND fleet IS ?6 AND collection = 'items')))`
-      : view === "fleet"
-        ? `AND (${fleetChangesSql("?6")} OR (collection IN ('items', 'orchestrators') AND EXISTS
-             (SELECT 1 FROM changes AS was WHERE was.collection = changes.collection AND was.doc_id = changes.doc_id AND was.fleet IS ?6)))`
+      ? `AND ((orchestrator = ?2 AND +fleet IS ?6) OR (collection = 'meta' AND doc_id = 'schedule')
+         OR (collection = 'items' AND doc_id IN (SELECT doc_id FROM changes WHERE orchestrator = ?2 AND +fleet IS ?6 AND collection = 'items')))`
+      : view === "fleet" || view === "named"
+        ? `AND ${fleetChangesSql(view === "named", "?6")}`
         : "";
   return `WITH p AS (SELECT ?1, ?2, ?3, ?4, ?5, ?6),
   head AS (SELECT coalesce(max(seq), 0) AS cursor FROM changes),
@@ -87,7 +87,7 @@ function head(view: View): string {
 // archived in its fleet, by the fleet each change row recorded, so a move in or out counts too.
 function archivedMayChange(view: View): string {
   if (view === "manager") return "EXISTS (SELECT 1 FROM ch WHERE collection = 'items')";
-  const mine = view === "fleet" ? " AND fleet IS ?6" : "";
+  const mine = view === "fleet" || view === "named" ? " AND fleet IS ?6" : "";
   return `EXISTS (SELECT 1 FROM ch WHERE ch.collection = 'items' AND
     coalesce((SELECT status = 'archived'${mine} FROM docs WHERE collection = 'items' AND id = ch.doc_id), 0) IS NOT coalesce(
       (SELECT CASE WHEN op = 'delete' THEN 0 ELSE coalesce(status = 'archived'${mine}, 0) END FROM changes
@@ -103,7 +103,7 @@ function visibleDocs(view: View): string {
        OR (d.collection = 'orchestrators' AND d.id = ?2 AND d.fleet IS ?6)
        OR (d.collection = 'meta' AND d.id = 'schedule')`;
   }
-  const docs = view === "fleet" ? "(d.collection IN ('items', 'orchestrators') AND d.fleet IS ?6)" : "d.collection IN ('items', 'orchestrators')";
+  const docs = view === "all" ? "d.collection IN ('items', 'orchestrators')" : "(d.collection IN ('items', 'orchestrators') AND d.fleet IS ?6)";
   return `${docs} OR (d.collection = 'meta' AND d.id IN ('manager', 'lease', 'schedule'))`;
 }
 
@@ -114,13 +114,13 @@ async function delta(c: Ctx): Promise<Response> {
   const db = c.env.DB;
   const scope = orchestratorScope(c.caller);
   const fleet = fleetScope(c.caller);
-  const view: View = scope !== null ? "manager" : fleet !== undefined ? "fleet" : "all";
+  const view: View = scope !== null ? "manager" : fleet === undefined ? "all" : fleet === null ? "fleet" : "named";
   const p = c.caller.principal;
   const email = p.kind === "human" ? p.email.toLowerCase() : "";
   const binds = [since, scope ?? "", email ? `human:${email}` : "", email, c.now, fleet ?? null];
   const pre = head(view);
   const stmt = (sql: string) => db.prepare(pre + sql).bind(...binds);
-  const own = view === "manager" ? " AND orchestrator = ?2 AND fleet IS ?6" : view === "fleet" ? " AND fleet IS ?6" : "";
+  const own = view === "manager" ? " AND orchestrator = ?2 AND fleet IS ?6" : view === "all" ? "" : " AND fleet IS ?6";
 
   const [top, keys, docs, users, snoozes, pins, routines] = await db.batch<any>([
     stmt(`SELECT head.cursor, ok.ok,

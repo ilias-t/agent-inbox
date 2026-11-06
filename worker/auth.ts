@@ -4,7 +4,7 @@
 // (browsers), else DEV_NO_ACCESS on localhost only.
 
 import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from "jose";
-import { DEFAULT_FLEET, type Principal, type Role } from "../shared/types.ts";
+import { DEFAULT_FLEET, FLEET_ID_RE, type Principal, type Role } from "../shared/types.ts";
 import type { Env } from "./env.ts";
 import { forbidden, HttpError, safeEqual, sha256Hex, unauthorized } from "./http.ts";
 import { atLeast, resolveRole } from "./users.ts";
@@ -90,9 +90,10 @@ async function bearerCaller(raw: string, env: Env, ctx: ExecutionContext): Promi
         .catch((e) => console.error("last_used_at", e)),
     );
   }
-  // NULL is the default fleet. A stored value no fleet id can have (only a hand-edited row holds one) matches no
-  // doc: the token then sees and writes nothing that belongs to a fleet, rather than everything.
-  const fleet = row.fleet;
+  // NULL (or "default") is the default fleet. Any other value must be a fleet id: a hand-edited row that holds
+  // something else is refused, rather than scoped to a fleet no doc can name.
+  const fleet = row.fleet === DEFAULT_FLEET ? null : row.fleet;
+  if (fleet !== null && !FLEET_ID_RE.test(fleet)) throw unauthorized("Token has an invalid fleet");
   const principal: Principal =
     row.scope === "orchestrator"
       ? { kind: "token", name: row.name, scope: "orchestrator", orchestrator: row.orchestrator ?? "", fleet: fleet ?? DEFAULT_FLEET }

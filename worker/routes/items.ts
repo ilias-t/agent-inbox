@@ -22,7 +22,7 @@ import { CLOSURE_FIELDS } from "../hooks/github.ts";
 import { notifyAnswer, notifyItemCreated, notifyReassigned } from "../notify.ts";
 import { docResponse, opRoute, type WriteOp } from "../ops.ts";
 import type { Ctx, Route } from "../router.ts";
-import { deleteDoc, getDoc, landedClause, listDocs, mergePatch, mutate } from "../store.ts";
+import { COLS, deleteDoc, getDoc, landedClause, listDocs, mergePatch, mutate, pinClause, toDoc, type DeletePin, type DocRow } from "../store.ts";
 import { requireHeld } from "./lease.ts";
 import { dropPins } from "./pins.ts";
 
@@ -297,6 +297,7 @@ export function putItemOp(c: Ctx, id: string, body: Record<string, unknown>): Wr
     collection: ITEMS,
     id,
     ifVersion: ifVersion(body.if_version),
+    authorize: (cur) => checkScopedRead(c.caller, cur),
     build: (cur) => {
       // A replace that omits status/type/created_at keeps the stored ones;
       // a create defaults them.
@@ -336,6 +337,7 @@ export function patchItemOp(c: Ctx, id: string, body: Record<string, unknown>): 
     collection: ITEMS,
     id,
     ifVersion: ifVersion(body.if_version),
+    authorize: (cur) => checkScopedRead(c.caller, cur),
     build: (cur) => {
       if (!cur) throw notFound(`No item ${id}`);
       const next = mergePatch(cur.data, patch);
@@ -366,6 +368,7 @@ export function claimOp(c: Ctx, id: string, body: Record<string, unknown>): Writ
     collection: ITEMS,
     id,
     ifVersion: ifVersion(body.if_version),
+    authorize: (cur) => checkScopedRead(c.caller, cur),
     build: async (cur) => {
       if (!cur) throw notFound(`No item ${id}`);
       requireFleet(c.caller, cur.data);
@@ -400,6 +403,7 @@ export function archiveOp(c: Ctx, id: string, body: Record<string, unknown>): Wr
     collection: ITEMS,
     id,
     ifVersion: pin,
+    authorize: (cur) => checkScopedRead(c.caller, cur),
     build: (cur) => {
       if (!cur) throw notFound(`No item ${id}`);
       requireFleet(c.caller, cur.data);
@@ -432,6 +436,7 @@ export function withdrawOp(c: Ctx, id: string, body: Record<string, unknown>): W
     collection: ITEMS,
     id,
     ifVersion: pin,
+    authorize: (cur) => checkScopedRead(c.caller, cur),
     build: (cur) => {
       if (!cur) throw notFound(`No item ${id}`);
       requireFleet(c.caller, cur.data);
@@ -502,19 +507,20 @@ async function deleteItem(c: Ctx): Promise<Response> {
   return json({ ok: true });
 }
 
-async function deleteItemPinned(c: Ctx, id: string, pin: number | undefined): Promise<"deleted" | "missing"> {
+async function deleteItemPinned(c: Ctx, id: string, pin: DeletePin): Promise<"deleted" | "missing"> {
   // The qa and everyone's snoozes and pins on it go first, while the item still exists
   // (the change-log trigger reads its orchestrator), under the same pin as the
   // item delete that follows in the same transaction: all happen or none does.
   const dropQa = c.env.DB.prepare(
-    `DELETE FROM docs WHERE collection = ? AND EXISTS
-       (SELECT 1 FROM docs WHERE collection = 'items' AND id = ? AND (?3 IS NULL OR version = ?3))`,
-  ).bind(qaCollection(id), id, pin ?? null);
+    `DELETE FROM docs WHERE collection = ?1 AND EXISTS
+       (SELECT 1 FROM docs WHERE collection = 'items' AND id = ?2 AND ${pinClause("?3", "?4")})`,
+  ).bind(qaCollection(id), id, pin.version ?? null, pin.createdAt ?? null);
   const dropSnoozes = c.env.DB.prepare(
     `DELETE FROM snoozes WHERE item_id = ?1 AND EXISTS
-       (SELECT 1 FROM docs WHERE collection = 'items' AND id = ?1 AND (?2 IS NULL OR version = ?2))`,
-  ).bind(id, pin ?? null);
-  return deleteDoc(c.env.DB, ITEMS, id, pin, [dropQa, dropSnoozes, dropPins(c.env.DB, "item", id, ITEMS, pin)]);
+       (SELECT 1 FROM docs WHERE collection = 'items' AND id = ?1 AND ${pinClause("?2", "?3")})`,
+  ).bind(id, pin.version ?? null, pin.createdAt ?? null);
+  const before = [dropQa, dropSnoozes, dropPins(c.env.DB, "item", id, ITEMS, pin)];
+  return deleteDoc(c.env.DB, ITEMS, id, pin, before, (cur) => checkScopedRead(c.caller, cur as Doc<Item>));
 }
 
 // What a decision is bound to: the version the human saw (the page's
@@ -540,7 +546,8 @@ export async function decideItem(
   caller?: Caller, // a token's decide stays in its own fleet; hooks pass none
 ): Promise<Doc<Item>> {
   if (choice === "other" && !note?.trim()) throw badRequest('choice "other" requires a note');
-  const { doc } = await mutate<Item>(env.DB, ITEMS, id, { actor, now }, (cur) => {
+  const authorize = caller ? (cur: Doc<Item>) => requireFleet(caller, cur.data) : undefined;
+  const { doc } = await mutate<Item>(env.DB, ITEMS, id, { actor, now, authorize }, (cur) => {
     if (!cur) throw notFound(`No item ${id}`);
     if (caller) requireFleet(caller, cur.data);
     const d = cur.data;
@@ -583,9 +590,19 @@ async function decide(c: Ctx): Promise<Response> {
 
 // --- Q&A ---------------------------------------------------------------------
 
+// The item and its thread in one batch (one transaction), so the check on the item holds for the thread read
+// with it: a concurrent move to another fleet can't slip that fleet's answers in between.
 async function listQa(c: Ctx): Promise<Response> {
-  await readItem(c);
-  return json({ messages: await listDocs<QaMessage>(c.env.DB, qaCollection(c.params.id)) });
+  const db = c.env.DB;
+  const id = c.params.id;
+  const [item, messages] = await db.batch<DocRow>([
+    db.prepare(`SELECT ${COLS} FROM docs WHERE collection = 'items' AND id = ?`).bind(id),
+    db.prepare(`SELECT ${COLS} FROM docs WHERE collection = ? ORDER BY created_at, id`).bind(qaCollection(id)),
+  ]);
+  const row = item.results[0];
+  if (!row) throw notFound(`No item ${id}`);
+  checkScopedRead(c.caller, toDoc<Item>(row));
+  return json({ messages: messages.results.map((r) => toDoc<QaMessage>(r)) });
 }
 
 function defaultRole(caller: Caller): QaRole {
@@ -624,6 +641,7 @@ export function qaOp(c: Ctx, id: string, body: Record<string, unknown>): WriteOp
     collection: ITEMS,
     id,
     ifVersion: ifVersion(body.if_version),
+    authorize: (cur) => checkScopedRead(c.caller, cur),
     extra: ({ version }) => [
       c.env.DB.prepare(
         `INSERT INTO docs (collection, id, data, version, created_at, updated_at, updated_by)

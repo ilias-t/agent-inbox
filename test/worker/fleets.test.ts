@@ -280,3 +280,119 @@ describe("review routines", () => {
     expect(c.results).toEqual([{ fleet: "fa" }]);
   });
 });
+
+describe("a 409 never hands a token another fleet's doc", () => {
+  it("checks the fleet before the pin: a wrong if_version on another fleet's doc is 403 with no current", async () => {
+    const o = uid("I");
+    await A.put(`/api/orchestrators/${o}`, { data: { goal: "secret goal" } });
+    const id = uid("fa-pin");
+    await A.put(`/api/items/${id}`, { data: { type: "decision", title: "secret title" } });
+    const v = (await human.get(`/api/items/${id}`)).body.version;
+    for (const pin of [0, v + 1]) {
+      const refused = [
+        await B.put(`/api/items/${id}`, { data: { type: "info", title: "x" }, if_version: pin }),
+        await B.patch(`/api/items/${id}`, { data: { summary: "x" }, if_version: pin }),
+        await B.post(`/api/items/${id}/decide`, { choice: "ack", if_version: pin }),
+        await B.post(`/api/items/${id}/claim`, { if_version: pin }),
+        await B.post(`/api/items/${id}/archive`, { if_version: pin }),
+        await B.post(`/api/items/${id}/withdraw`, { if_version: pin }),
+        await B.post(`/api/items/${id}/qa`, { text: "a", if_version: pin }),
+        await B.del(`/api/items/${id}?if_version=${pin}`),
+        await B.put(`/api/orchestrators/${o}`, { data: { goal: "x" }, if_version: pin }),
+        await B.patch(`/api/orchestrators/${o}`, { data: { goal: "x" }, if_version: pin }),
+        await B.del(`/api/orchestrators/${o}?if_version=${pin}`),
+        await B.post("/api/batch", { ops: [{ op: "orchestrator.patch", id: o, data: { goal: "x" }, if_version: pin }] }),
+        await B.post("/api/batch", { ops: [{ op: "item.patch", id, data: { summary: "x" }, if_version: pin }] }),
+      ];
+      expect(refused.map((r) => r.status), `if_version ${pin}`).toEqual(refused.map(() => 403));
+      for (const r of refused) expect(r.body).not.toHaveProperty("current");
+      expect(JSON.stringify(refused.map((r) => r.body))).not.toMatch(/secret/);
+    }
+  });
+});
+
+describe("moves between fleets", () => {
+  it("wake the fleet a doc left, in its change feed, and its delta drops it", async () => {
+    const id = uid("fa-wake");
+    await A.put(`/api/items/${id}`, { data: { type: "info", title: "a" } });
+    const c0 = await cursorNow();
+    await human.patch(`/api/items/${id}`, { data: { fleet: "fb" } });
+    const rows = (await A.get(`/api/changes?since=${c0}`)).body.changes;
+    expect(rows.map((r: any) => [r.collection, r.doc_id, r.status])).toEqual([["items", id, null]]);
+    // The delta drops it even when everything about it before the cursor was pruned.
+    await env.DB.prepare("DELETE FROM changes WHERE collection = 'items' AND doc_id = ? AND seq <= ?").bind(id, c0).run();
+    expect((await A.get(`/api/state/delta?since=${c0}`)).body.deleted).toEqual([{ collection: "items", id }]);
+    // Later writes in its new fleet don't reach the old one at all.
+    const c1 = await cursorNow();
+    await B.patch(`/api/items/${id}`, { data: { summary: "b" } });
+    expect((await A.get(`/api/changes?since=${c1}`)).body.changes).toEqual([]);
+    expect((await A.get(`/api/state/delta?since=${c1}`)).body.deleted).toEqual([]);
+  });
+
+  it("drop a moved manager doc from its fleet's and its manager token's delta", async () => {
+    const o = uid("I");
+    const mgr = agent((await mintFleetToken("fa", "orchestrator", o)).secret);
+    await mgr.put(`/api/orchestrators/${o}`, { data: { goal: "g" } });
+    const c0 = await cursorNow();
+    await human.patch(`/api/orchestrators/${o}`, { data: { fleet: "fb" } });
+    for (const c of [A, mgr]) {
+      const d = (await c.get(`/api/state/delta?since=${c0}`)).body;
+      expect(d.orchestrators).toEqual([]);
+      expect(d.deleted).toEqual([{ collection: "orchestrators", id: o }]);
+      expect(ids((await c.get("/api/state")).body.orchestrators)).not.toContain(o);
+    }
+    expect(ids((await B.get(`/api/state/delta?since=${c0}`)).body.orchestrators)).toEqual([o]);
+  });
+});
+
+describe("review routines of another fleet", () => {
+  it("are 403 to read through every route, and to update a run request on", async () => {
+    const r = uid("rv");
+    const own = agent((await mintFleetToken("fa", "orchestrator", r)).secret);
+    await own.post("/api/reviews/report", { stamp: stamp(0), result: "ok", report: reportOf([1]) });
+    expect((await human.post(`/api/reviews/${r}/run-request`, {})).status).toBe(201);
+    const req = (await human.get(`/api/reviews/${r}/run-request`)).body.request;
+    const other = agent((await mintFleetToken("fb", "orchestrator", r)).secret);
+    const refused = [
+      await other.get(`/api/reviews/${r}`),
+      await other.get(`/api/reviews/${r}/prs/1`),
+      await other.get(`/api/reviews/${r}/runs/${stamp(0)}`),
+      await other.get(`/api/reviews/${r}/run-request`),
+      await other.post(`/api/reviews/run-requests/${req.id}`, { status: "starting" }),
+    ];
+    expect(refused.map((x) => x.status)).toEqual([403, 403, 403, 403, 403]);
+    expect((await human.get(`/api/reviews/${r}/run-request`)).body.request).toEqual(req);
+    expect((await own.post(`/api/reviews/run-requests/${req.id}`, { status: "starting" })).status).toBe(200);
+  });
+});
+
+describe("token fleet values", () => {
+  it("reads a stored 'default' as the default fleet, and refuses a token whose fleet isn't a fleet id", async () => {
+    const t = await mintFleetToken("default");
+    const c = agent(t.secret);
+    expect((await c.get("/api/me")).body.fleet).toBe("default");
+    expect(ids((await c.get("/api/items")).body.items)).toContain(dItem);
+    const bad = await mintFleetToken("Not A Fleet");
+    expect((await agent(bad.secret).get("/api/me")).status).toBe(401);
+  });
+
+  it("keeps a stored fleet: null as it is, so a manager token's write on a decided item isn't a content change", async () => {
+    const o = uid("I"), id = uid("null-fleet");
+    const mgr = agent((await mintFleetToken(null, "orchestrator", o)).secret);
+    await createItem(id, { orchestrator: o, source: o });
+    await env.DB.prepare("UPDATE docs SET data = json_set(data, '$.fleet', json('null')) WHERE collection = 'items' AND id = ?").bind(id).run();
+    await human.post(`/api/items/${id}/decide`, { choice: "ack" });
+    const r = await mgr.patch(`/api/items/${id}`, { data: { assignee: "a@team.test" } });
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    expect(r.body.data.fleet).toBeNull();
+  });
+});
+
+describe("shared meta docs", () => {
+  it("a meta id with a colon that names no per-fleet doc stays in the default fleet's feed", async () => {
+    const c0 = await cursorNow();
+    expect((await human.put("/api/meta/notes:v1", { data: { x: 1 } })).status).toBeLessThan(300);
+    const rows = (await D.get(`/api/changes?since=${c0}`)).body.changes.map((r: any) => r.doc_id);
+    expect(rows).toContain("notes:v1");
+  });
+});

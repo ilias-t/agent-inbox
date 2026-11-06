@@ -29,9 +29,11 @@ const SCOPE_FILTER = "AND orchestrator = ?1";
 // Fleets (docs/api.md "Fleets"): the triggers record each change's fleet too
 // (migration 0012). A token sees its own fleet's rows (a manager token those
 // of its own orchestrator id in it); a human, every fleet, or one with
-// ?fleet=, as that fleet's orchestrator token sees it. ?4 is the fleet.
-const FLEET_FILTER = `AND ${fleetChangesSql("?4")}`;
-const MANAGER_FLEET_FILTER = "AND fleet IS ?4";
+// ?fleet=, as that fleet's orchestrator token sees it. ?4 is the fleet. A
+// manager token's rows are found through changes_orchestrator, as before
+// (`+fleet` keeps the planner off changes_fleet).
+const FLEET_FILTER = (named: boolean) => `AND ${fleetChangesSql(named, "?4")}`;
+const MANAGER_FLEET_FILTER = "AND +fleet IS ?4";
 
 // Snoozes and pins are one human's own (migrations 0007, 0010): only that
 // human's feed shows them, so teammates' pages don't refetch and no token
@@ -58,13 +60,15 @@ async function changes(c: Ctx): Promise<Response> {
   }
   const scope = orchestratorScope(c.caller);
   const fleet = fleetFilter(c.caller, q);
-  const fleetSql = fleet === undefined ? "" : scope !== null ? MANAGER_FLEET_FILTER : FLEET_FILTER;
+  const fleetSql = fleet === undefined ? "" : scope !== null ? MANAGER_FLEET_FILTER : FLEET_FILTER(fleet !== null);
   const sql = `SELECT seq, collection, doc_id, op, version, status, actor, at FROM changes
     WHERE seq > ?2 ${collection ? COLLECTION_FILTERS[collection] : ""} ${scope !== null ? SCOPE_FILTER : ""} ${fleetSql} ${SNOOZE_FILTER}
     ORDER BY seq LIMIT ${PAGE}`;
   const p = c.caller.principal;
   const self = p.kind === "human" ? `human:${p.email.toLowerCase()}` : "";
-  const stmt = db.prepare(sql).bind(scope ?? "", Math.floor(since), self, ...(fleet === undefined ? [] : [fleet]));
+  // ?4 is bound only when the SQL names it: the default fleet's orchestrator-token filter doesn't.
+  const bindFleet = fleetSql.includes("?4");
+  const stmt = db.prepare(sql).bind(scope ?? "", Math.floor(since), self, ...(bindFleet ? [fleet] : []));
 
   // A long-poll the client has abandoned (tab hidden, navigation, network
   // drop) stops querying D1 straight away rather than at its deadline. The

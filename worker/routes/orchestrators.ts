@@ -9,7 +9,7 @@ import { deleteInFleet, stampFleet } from "../fleets.ts";
 import { badRequest, forbidden, ifVersion, isObject, json, notFound } from "../http.ts";
 import { docResponse, opRoute, type WriteOp } from "../ops.ts";
 import type { Ctx, Route } from "../router.ts";
-import { deleteDoc, getDoc, listDocs, mergePatch } from "../store.ts";
+import { deleteDoc, getDoc, listDocs, mergePatch, type DeletePin } from "../store.ts";
 import { dropPins } from "./pins.ts";
 
 const ORCH = "orchestrators";
@@ -52,6 +52,7 @@ export function putOrchestratorOp(c: Ctx, id: string, body: Record<string, unkno
     collection: ORCH,
     id,
     ifVersion: ifVersion(body.if_version),
+    authorize: (cur) => requireFleet(c.caller, cur.data, "Manager"),
     build: (cur) => {
       const next: Orchestrator = { ...input };
       stampFleet(c.caller, cur?.data ?? null, next, true, "Manager");
@@ -69,6 +70,7 @@ export function patchOrchestratorOp(c: Ctx, id: string, body: Record<string, unk
     collection: ORCH,
     id,
     ifVersion: ifVersion(body.if_version),
+    authorize: (cur) => requireFleet(c.caller, cur.data, "Manager"),
     build: (cur) => {
       if (!cur) throw notFound(`No orchestrator ${id}`);
       const next = mergePatch(cur.data, p);
@@ -85,7 +87,8 @@ async function del(c: Ctx): Promise<Response> {
   requireFullRole(c.caller, "admin");
   const id = c.params.id;
   // Everyone's pins on it go in the same transaction, under the same version pin.
-  const del = (pin: number | undefined) => deleteDoc(c.env.DB, ORCH, id, pin, [dropPins(c.env.DB, "orch", id, ORCH, pin)]);
+  const del = (pin: DeletePin) =>
+    deleteDoc(c.env.DB, ORCH, id, pin, [dropPins(c.env.DB, "orch", id, ORCH, pin)], (cur) => requireFleet(c.caller, cur.data as object, "Manager"));
   await deleteInFleet(c, ORCH, id, ifVersion(c.url.searchParams.get("if_version")), del, "Manager");
   return json({ ok: true });
 }

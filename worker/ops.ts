@@ -25,7 +25,7 @@ export async function runOne(c: Ctx, op: WriteOp): Promise<Response> {
     c.env.DB,
     op.collection,
     op.id,
-    { actor: c.caller.actor, now: c.now, ifVersion: op.ifVersion, extra: op.extra },
+    { actor: c.caller.actor, now: c.now, ifVersion: op.ifVersion, extra: op.extra, authorize: op.authorize },
     op.build,
   );
   op.after?.(doc, created);

@@ -66,6 +66,8 @@ export function insertStmt(db: D1Database, collection: string, id: string, data:
     .bind(collection, id, JSON.stringify(data), now, now, actor);
 }
 
+// Pinned on the version read and on the doc's created_at, so a doc deleted and created again under the same id
+// (which starts over at version 1) is never written as if it were the one that was read.
 function updateStmt(
   db: D1Database,
   collection: string,
@@ -73,20 +75,23 @@ function updateStmt(
   data: unknown,
   actor: string,
   now: string,
-  version: number,
+  cur: { version: number; created_at: string },
 ) {
   return db
     .prepare(
       `UPDATE docs SET data = ?, version = version + 1, updated_at = ?, updated_by = ?
-       WHERE collection = ? AND id = ? AND version = ? RETURNING ${COLS}`,
+       WHERE collection = ? AND id = ? AND version = ? AND created_at = ? RETURNING ${COLS}`,
     )
-    .bind(JSON.stringify(data), now, actor, collection, id, version);
+    .bind(JSON.stringify(data), now, actor, collection, id, cur.version, cur.created_at);
 }
 
 export interface WriteOpts {
   actor: string;
   now: string;
   ifVersion?: number; // client pin; 0 = must not exist
+  // Throws (403) when the caller may not see the doc as it is now. It runs on every doc read before anything
+  // else, so a 409 never hands a caller (a token, in another fleet) a doc it can't read as `current`.
+  authorize?: (cur: Doc<any>) => void;
   // Statements to run in the same transaction after the doc write. They run
   // even when the pin fails, so each must guard itself on the write having
   // landed (see landedClause, which only works for the first one).
@@ -114,14 +119,18 @@ export async function mutate<T>(
   opts: WriteOpts,
   build: (cur: Doc<T> | null) => T | Promise<T>,
 ): Promise<{ doc: Doc<T>; created: boolean }> {
+  const seen = (doc: Doc<T> | null) => {
+    if (doc) opts.authorize?.(doc);
+    return doc;
+  };
   for (let attempt = 0; attempt < RETRIES; attempt++) {
-    const cur = await getDoc<T>(db, collection, id);
+    const cur = seen(await getDoc<T>(db, collection, id));
     if (opts.ifVersion !== undefined && (cur?.version ?? 0) !== opts.ifVersion) {
       throw conflict("conflict", `Version mismatch: have ${cur?.version ?? 0}, if_version ${opts.ifVersion}`, cur);
     }
     const data = await build(cur);
     const write = cur
-      ? updateStmt(db, collection, id, data, opts.actor, opts.now, cur.version)
+      ? updateStmt(db, collection, id, data, opts.actor, opts.now, cur)
       : insertStmt(db, collection, id, data, opts.actor, opts.now);
     let row: DocRow | null;
     if (opts.extra) {
@@ -132,11 +141,11 @@ export async function mutate<T>(
     }
     if (row) return { doc: toDoc<T>(row), created: !cur };
     if (opts.ifVersion !== undefined) {
-      const now = await getDoc(db, collection, id);
+      const now = seen(await getDoc<T>(db, collection, id));
       throw conflict("conflict", "Document changed during the write", now);
     }
   }
-  throw conflict("conflict", "Too much contention, retry", await getDoc(db, collection, id));
+  throw conflict("conflict", "Too much contention, retry", seen(await getDoc<T>(db, collection, id)));
 }
 
 // One doc write of a mutateMany: mutate's arguments as data.
@@ -146,6 +155,7 @@ export interface DocWrite<T = unknown> {
   ifVersion?: number; // client pin; 0 = must not exist
   build: (cur: Doc<T> | null) => T | Promise<T>;
   extra?: WriteOpts["extra"];
+  authorize?: WriteOpts["authorize"];
 }
 
 // The docs at these keys, in order (null where missing), in one statement.
@@ -165,14 +175,14 @@ async function readDocs(db: D1Database, keys: { collection: string; id: string }
 }
 
 // Fails (NOT NULL on docs.collection), and so rolls back the whole batch it
-// opens, when any doc's version differs from the one its write was built on
-// (0 = absent). D1 doesn't roll back a batch for an UPDATE that matched no
-// row, so this is what makes the batch all-or-nothing.
+// opens, when any doc's version (0 = absent) or created_at differs from the
+// one its write was built on. D1 doesn't roll back a batch for an UPDATE that
+// matched no row, so this is what makes the batch all-or-nothing.
 const GUARD_SQL = `INSERT INTO docs (collection, id, data, version, created_at, updated_at)
   SELECT NULL, '', '{}', 0, '', '' WHERE EXISTS (
     SELECT 1 FROM json_each(?) AS j
     LEFT JOIN docs AS d ON d.collection = json_extract(j.value, '$[0]') AND d.id = json_extract(j.value, '$[1]')
-    WHERE coalesce(d.version, 0) <> json_extract(j.value, '$[2]'))`;
+    WHERE coalesce(d.version, 0) <> json_extract(j.value, '$[2]') OR d.created_at IS NOT json_extract(j.value, '$[3]'))`;
 
 // Several read-modify-writes in one transaction: all land or none do. Each
 // write keeps mutate's rules: a client pin that doesn't match is a 409
@@ -190,6 +200,7 @@ export async function mutateMany(
     for (const [i, w] of writes.entries()) {
       const cur = curs[i];
       try {
+        if (cur) w.authorize?.(cur);
         if (w.ifVersion !== undefined && (cur?.version ?? 0) !== w.ifVersion) {
           throw conflict("conflict", `Version mismatch: have ${cur?.version ?? 0}, if_version ${w.ifVersion}`, cur);
         }
@@ -199,7 +210,7 @@ export async function mutateMany(
       }
     }
 
-    const pins = writes.map((w, i) => [w.collection, w.id, curs[i]?.version ?? 0]);
+    const pins = writes.map((w, i) => [w.collection, w.id, curs[i]?.version ?? 0, curs[i]?.created_at ?? null]);
     const stmts: D1PreparedStatement[] = [db.prepare(GUARD_SQL).bind(JSON.stringify(pins))];
     const at: number[] = []; // each write's statement index
     for (const [i, w] of writes.entries()) {
@@ -207,7 +218,7 @@ export async function mutateMany(
       at.push(stmts.length);
       stmts.push(
         cur
-          ? updateStmt(db, w.collection, w.id, data, opts.actor, opts.now, cur.version)
+          ? updateStmt(db, w.collection, w.id, data, opts.actor, opts.now, cur)
           : insertStmt(db, w.collection, w.id, data, opts.actor, opts.now),
       );
       // Right after its own write: landedClause reads that write's changes().
@@ -221,7 +232,7 @@ export async function mutateMany(
       // The guard tripped when a doc moved since the read: go again (a moved
       // pinned doc then fails its pin). Anything else is a real error.
       const now = await readDocs(db, writes);
-      if (now.every((d, i) => (d?.version ?? 0) === (curs[i]?.version ?? 0))) throw e;
+      if (now.every((d, i) => (d?.version ?? 0) === (curs[i]?.version ?? 0) && d?.created_at === curs[i]?.created_at)) throw e;
       continue;
     }
     return writes.map((_, i) => {
@@ -233,27 +244,37 @@ export async function mutateMany(
   throw conflict("conflict", "Too much contention, retry", null);
 }
 
+// What a delete is pinned on: a version (a client's if_version, or the one a scoped caller read), and with it
+// the created_at that was read, so a doc created again under the same id isn't deleted in its place.
+export interface DeletePin {
+  version?: number;
+  createdAt?: string;
+}
+
+// The guard a delete's `before` statements share with it: ?N binds the version (or null), ?N+1 the created_at.
+export const pinClause = (v: string, ca: string) => `(${v} IS NULL OR version = ${v}) AND (${ca} IS NULL OR created_at = ${ca})`;
+
 // Delete one doc, optionally pinned. `before` runs first in the same
-// transaction and must guard itself on the same pin, so it only acts when the
-// delete will. Returns "missing" when the doc wasn't there.
+// transaction and must guard itself on the same pin (pinClause), so it only
+// acts when the delete will. Returns "missing" when the doc wasn't there.
+// `authorize` vets the doc before a 409 hands it back as `current`.
 export async function deleteDoc(
   db: D1Database,
   collection: string,
   id: string,
-  ifVersion: number | undefined,
+  pin: DeletePin,
   before: D1PreparedStatement[] = [],
+  authorize?: (cur: Doc<unknown>) => void,
 ): Promise<"deleted" | "missing"> {
-  const del =
-    ifVersion === undefined
-      ? db.prepare("DELETE FROM docs WHERE collection = ? AND id = ? RETURNING version").bind(collection, id)
-      : db
-          .prepare("DELETE FROM docs WHERE collection = ? AND id = ? AND version = ? RETURNING version")
-          .bind(collection, id, ifVersion);
+  const del = db
+    .prepare(`DELETE FROM docs WHERE collection = ?1 AND id = ?2 AND ${pinClause("?3", "?4")} RETURNING version`)
+    .bind(collection, id, pin.version ?? null, pin.createdAt ?? null);
   const results = await db.batch([...before, del]);
   if (results[results.length - 1].results.length) return "deleted";
   const cur = await getDoc(db, collection, id);
   if (!cur) return "missing";
-  throw conflict("conflict", `Version mismatch: have ${cur.version}, if_version ${ifVersion}`, cur);
+  authorize?.(cur);
+  throw conflict("conflict", `Version mismatch: have ${cur.version}, if_version ${pin.version}`, cur);
 }
 
 // Shallow merge where a null value deletes the key (PATCH semantics). Own keys only, and never one that could

@@ -149,7 +149,7 @@ export function canonicalJson(v: unknown): string {
 
 export const bodySha = (body: unknown) => sha256Hex(canonicalJson(body));
 
-const RUN_COLS = "routine, stamp, started_at, finished_at, result, dry, has_report, report_sha, data";
+export const RUN_COLS = "routine, stamp, started_at, finished_at, result, dry, has_report, report_sha, data";
 
 // The report's statements, in the order they must run: the head first, the run last (statements 2-4 read
 // "is the run finished?" and the newest stored report, which the run row would change).

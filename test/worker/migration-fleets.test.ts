@@ -82,7 +82,7 @@ describe("migration 0012_fleets", () => {
     expect(await maxSeq()).toBe(seq);
   });
 
-  it("logs each change's fleet: an item's or manager's own, a qa message's item's, a meta doc's suffix, a fleet doc's id", async () => {
+  it("logs each change's fleet: an item's or manager's own, a qa message's item's, a per-fleet meta doc's, a fleet doc's id; a move also under the fleet it left", async () => {
     const now = new Date().toISOString();
     const item = uid("m12i"), plain = uid("m12p"), orch = uid("m12o");
     const ins = (collection: string, id: string, data: unknown) =>
@@ -101,6 +101,8 @@ describe("migration 0012_fleets", () => {
       ins("orchestrators", orch, { fleet: "side-b" }),
       ins("meta", "manager:side-a", {}),
       ins("meta", `${uid("plain")}`, {}),
+      ins("meta", `notes:${uid("v")}`, {}),
+      ins("meta", "schedule:default", {}),
       ins("fleets", "side-a", {}),
       ins("fleets", "default", {}),
     ]);
@@ -119,8 +121,11 @@ describe("migration 0012_fleets", () => {
       "create orchestrators side-b",
       "create meta side-a",
       "create meta null",
+      "create meta null",
+      "create meta null",
       "create fleets side-a",
       "create fleets null",
+      "update items side-a",
       "update items side-c",
       "delete items/<i>/qa side-c",
       "delete items side-c",

@@ -33,6 +33,7 @@ import {
   getRun,
   HEAD_COLS,
   PR_COLS,
+  RUN_COLS,
   REVIEWS_BODY_LIMIT,
   reportStatements,
   startStatements,
@@ -59,36 +60,60 @@ function invalid(problems: string[]): never {
 }
 
 // The routine a write is for: the token's own orchestrator id. Humans and the manager never write runs.
-async function writer(c: Ctx): Promise<string> {
-  const routine = orchestratorScope(c.caller);
+function writer(caller: Caller): string {
+  const routine = orchestratorScope(caller);
   if (routine === null) throw forbidden("Only a routine's own orchestrator token writes its reviews");
-  await requireRoutineFleet(c, routine);
   return routine;
 }
 
-// Humans and the manager read every routine; an orchestrator token only its own.
-async function requireReader(c: Ctx, routine: string): Promise<void> {
-  const scope = orchestratorScope(c.caller);
+// Humans and the manager read every routine; an orchestrator token only its own (and only in its own fleet:
+// each read checks the routine's fleet with routineFleet in the same batch as the data, so a routine another
+// fleet creates meanwhile can't slip in between).
+function requireReader(caller: Caller, routine: string): void {
+  const scope = orchestratorScope(caller);
   if (scope !== null && scope !== routine) throw forbidden("Not this token's routine");
-  await requireRoutineFleet(c, routine);
 }
 
-// A token reads and writes only a routine of its own fleet; one nobody has written yet is anyone's to create.
-async function requireRoutineFleet(c: Ctx, routine: string): Promise<void> {
-  const fleet = fleetScope(c.caller);
-  if (fleet === undefined) return;
-  const row = await c.env.DB.prepare("SELECT fleet FROM review_routines WHERE routine = ?").bind(routine).first<{ fleet: string | null }>();
-  if (row && row.fleet !== fleet) throw forbidden("Routine belongs to another fleet");
+// A token reads and writes only a routine of its own fleet (docs/api.md "Fleets"); one nobody has written yet is
+// anyone's to create. `row` is the routine's fleet as read with the data (undefined: no routine).
+const routineFleetSql = (db: D1Database, routine: string) => db.prepare("SELECT fleet FROM review_routines WHERE routine = ?").bind(routine);
+function checkRoutineFleet(caller: Caller, row: { fleet: string | null } | undefined): void {
+  const fleet = fleetScope(caller);
+  if (fleet !== undefined && row && row.fleet !== fleet) throw forbidden("Routine belongs to another fleet");
+}
+
+// A write's batch opens with this: it fails (NOT NULL on the routine), and so rolls the whole batch back, when the
+// routine belongs to another fleet than the writer's. Checked in the write's own transaction, so two fleets'
+// tokens racing to create one routine can't both land.
+const fleetGuard = (db: D1Database, routine: string, fleet: string | null) =>
+  db
+    .prepare(
+      `INSERT INTO review_routines (routine, version, updated_at) SELECT NULL, 0, ''
+       WHERE EXISTS (SELECT 1 FROM review_routines WHERE routine = ?1 AND fleet IS NOT ?2)`,
+    )
+    .bind(routine, fleet);
+
+// A write's statements behind fleetGuard, their results without its. When the batch fails, the routine's fleet
+// says whether the guard tripped (403) or something else did (rethrown).
+async function guardedBatch<T>(c: Ctx, routine: string, stmts: D1PreparedStatement[]): Promise<D1Result<T>[]> {
+  const db = c.env.DB;
+  try {
+    return (await db.batch<T>([fleetGuard(db, routine, fleetScope(c.caller) ?? null), ...stmts])).slice(1);
+  } catch (e) {
+    checkRoutineFleet(c.caller, (await routineFleetSql(db, routine).first<{ fleet: string | null }>()) ?? undefined);
+    throw e;
+  }
 }
 
 async function start(c: Ctx): Promise<Response> {
-  const routine = await writer(c);
+  const routine = writer(c.caller);
   const stamp = c.params.stamp;
   const body = await c.body();
   const problems = startPayloadProblems(stamp, body);
   if (problems.length) invalid(problems);
   const db = c.env.DB;
-  const results = await db.batch<RunRow>(startStatements(db, { routine, actor: c.caller.actor, now: c.now, fleet: fleetScope(c.caller) ?? null, stamp, body: body as ReviewStartPayload }));
+  const stmts = startStatements(db, { routine, actor: c.caller.actor, now: c.now, fleet: fleetScope(c.caller) ?? null, stamp, body: body as ReviewStartPayload });
+  const results = await guardedBatch<RunRow>(c, routine, stmts);
   const row = results[results.length - 1].results[0];
   if (row) return json(toRun(row), 201);
   // Already there (a retried start, or one that arrived after its report): as stored, nothing written.
@@ -98,7 +123,7 @@ async function start(c: Ctx): Promise<Response> {
 }
 
 async function report(c: Ctx): Promise<Response> {
-  const routine = await writer(c);
+  const routine = writer(c.caller);
   const body = await readJson(c.request, REVIEWS_BODY_LIMIT);
   const problems = reportPayloadProblems(body);
   if (problems.length) invalid(problems);
@@ -106,7 +131,7 @@ async function report(c: Ctx): Promise<Response> {
   const sha = await bodySha(body);
   const db = c.env.DB;
   const stmts = reportStatements(db, { routine, actor: c.caller.actor, now: c.now, fleet: fleetScope(c.caller) ?? null, sha, payload });
-  const results = await db.batch<RunRow>(stmts);
+  const results = await guardedBatch<RunRow>(c, routine, stmts);
   const row = results[results.length - 1].results[0];
   if (row) {
     const n = (i: number) => (payload.report ? results[i].meta.changes : 0);
@@ -179,11 +204,12 @@ function pageParams(c: Ctx): { before: string; limit: number } {
 
 async function routineView(c: Ctx): Promise<Response> {
   const routine = c.params.routine;
-  await requireReader(c, routine);
+  requireReader(c.caller, routine);
   const { before, limit } = pageParams(c);
   const db = c.env.DB;
   const goneSince = new Date(Date.parse(c.now) - GONE_SHOWN_MS).toISOString();
-  const [head, prs, runs] = await db.batch<any>([
+  const [fleet, head, prs, runs] = await db.batch<any>([
+    routineFleetSql(db, routine),
     db.prepare(`SELECT ${HEAD_COLS} FROM review_routines WHERE routine = ?`).bind(routine),
     db
       .prepare(`SELECT ${PR_COLS} FROM review_prs WHERE routine = ? AND (gone_at IS NULL OR gone_at > ?) ORDER BY number DESC`)
@@ -195,6 +221,7 @@ async function routineView(c: Ctx): Promise<Response> {
       )
       .bind(routine, before, limit + 1),
   ]);
+  checkRoutineFleet(c.caller, fleet.results[0]);
   const h = head.results[0] as HeadRow | undefined;
   if (!h) throw notFound(`No reviews for ${routine}`);
   const page = (runs.results as RunRow[]).slice(0, limit);
@@ -208,16 +235,18 @@ async function routineView(c: Ctx): Promise<Response> {
 
 async function prView(c: Ctx): Promise<Response> {
   const routine = c.params.routine;
-  await requireReader(c, routine);
+  requireReader(c.caller, routine);
   const n = Number(c.params.n);
   if (!/^\d{1,9}$/.test(c.params.n) || n < 1) throw badRequest("The PR number must be a positive integer");
   const db = c.env.DB;
-  const [pr, events] = await db.batch<any>([
+  const [fleet, pr, events] = await db.batch<any>([
+    routineFleetSql(db, routine),
     db.prepare(`SELECT ${PR_COLS} FROM review_prs WHERE routine = ? AND number = ?`).bind(routine, n),
     db
       .prepare(`SELECT routine, number, stamp, data FROM review_events WHERE routine = ? AND number = ? ORDER BY stamp DESC LIMIT ${EVENTS_PAGE}`)
       .bind(routine, n),
   ]);
+  checkRoutineFleet(c.caller, fleet.results[0]);
   const row = pr.results[0] as PrRow | undefined;
   if (!row) throw notFound(`${routine} doesn't track #${n}`);
   return json({
@@ -228,9 +257,12 @@ async function prView(c: Ctx): Promise<Response> {
 
 async function runView(c: Ctx): Promise<Response> {
   const { routine, stamp } = c.params;
-  await requireReader(c, routine);
+  requireReader(c.caller, routine);
   if (!STAMP_RE.test(stamp)) throw badRequest('The stamp must look like "2026-10-08T180000Z"');
-  const row = await getRun(c.env.DB, routine, stamp);
+  const db = c.env.DB;
+  const [fleet, run] = await db.batch<any>([routineFleetSql(db, routine), db.prepare(`SELECT ${RUN_COLS} FROM review_runs WHERE routine = ? AND stamp = ?`).bind(routine, stamp)]);
+  checkRoutineFleet(c.caller, fleet.results[0]);
+  const row = run.results[0] as RunRow | undefined;
   if (!row) throw notFound(`No run ${routine}/${stamp}`);
   return json(toRun(row));
 }
@@ -272,7 +304,7 @@ const UPDATE_FROM: Record<ReviewRunRequestUpdate["status"], ReviewRunRequest["st
 
 const ago = (now: string, ms: number) => new Date(Date.parse(now) - ms).toISOString();
 const headOf = (db: D1Database, routine: string) =>
-  db.prepare(`SELECT ${HEAD_COLS} FROM review_routines WHERE routine = ?`).bind(routine).first<HeadRow>();
+  db.prepare(`SELECT ${HEAD_COLS}, fleet FROM review_routines WHERE routine = ?`).bind(routine).first<HeadRow & { fleet: string | null }>();
 
 // Humans only, deciders and admins: no token can spend a routine's run on its own.
 async function createRunRequest(c: Ctx): Promise<Response> {
@@ -322,8 +354,9 @@ async function createRunRequest(c: Ctx): Promise<Response> {
 
 async function getRunRequest(c: Ctx): Promise<Response> {
   const routine = c.params.routine;
-  await requireReader(c, routine);
+  requireReader(c.caller, routine);
   const h = await headOf(c.env.DB, routine);
+  checkRoutineFleet(c.caller, h ?? undefined);
   if (!h) throw notFound(`No reviews for ${routine}`);
   return json({ request: toHead(h).run_request } satisfies ReviewRunRequestResponse);
 }
@@ -331,7 +364,7 @@ async function getRunRequest(c: Ctx): Promise<Response> {
 // The routine's own token reports how its request went. A retry of the update it already made answers the request
 // as stored; any other move is 409 with it, and a request another one replaced is 404.
 async function updateRunRequest(c: Ctx): Promise<Response> {
-  const routine = await writer(c);
+  const routine = writer(c.caller);
   const id = c.params.id;
   const body = await c.body();
   const problems = runRequestUpdateProblems(body);
@@ -344,13 +377,14 @@ async function updateRunRequest(c: Ctx): Promise<Response> {
          run_request = json_set(run_request, '$.status', ?3, '$.updated_at', ?4, '$.stamp', ?5, '$.message', ?6),
          updated_at = ?4, updated_by = ?7
        WHERE routine = ?1 AND json_extract(run_request, '$.id') = ?2
-         AND json_extract(run_request, '$.status') IN (SELECT value FROM json_each(?8))
+         AND json_extract(run_request, '$.status') IN (SELECT value FROM json_each(?8)) AND fleet IS ?9
        RETURNING ${HEAD_COLS}`,
     )
-    .bind(routine, id, u.status, c.now, u.stamp ?? null, u.message || null, c.caller.actor, JSON.stringify(UPDATE_FROM[u.status]))
+    .bind(routine, id, u.status, c.now, u.stamp ?? null, u.message || null, c.caller.actor, JSON.stringify(UPDATE_FROM[u.status]), fleetScope(c.caller) ?? null)
     .first<HeadRow>();
   if (row) return json({ request: toHead(row).run_request } satisfies ReviewRunRequestResponse);
   const h = await headOf(db, routine);
+  checkRoutineFleet(c.caller, h ?? undefined);
   const cur = h ? toHead(h).run_request : null;
   if (!cur || cur.id !== id) throw notFound(`No run request ${id} for ${routine}`);
   if (cur.status === u.status && (u.status !== "started" || cur.stamp === u.stamp)) {
