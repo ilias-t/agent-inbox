@@ -5,7 +5,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import type { StateResponse } from "../../shared/types.ts";
 import { DELTA_MAX_CHANGES } from "../../worker/routes/delta.ts";
 import { applyDelta, normalize, rng } from "./delta-merge.ts";
-import { agent, createItem, human, mintToken, person, setRoles, uid } from "./helpers.ts";
+import { agent, createItem, human, mintFleetToken, mintToken, person, setRoles, uid } from "./helpers.ts";
 import { reportOf, routine, stamp } from "./reviews-helpers.ts";
 
 const cursorNow = async () => (await human.get("/api/changes")).body.cursor as number;
@@ -347,21 +347,26 @@ describe("GET /api/state/delta", () => {
   // The property the client relies on: a snapshot with every delta since applied equals a fresh snapshot, for
   // every kind of caller, over a random (seeded) run of writes. Its time is HTTP round trips through workerd and D1
   // (the data stays a handful of docs), so each op is one request and each kind gets a fixed number of turns.
-  // Each op kind ROUNDS times (creates twice), a delta and a fresh snapshot per pull, and the setup come to about 155
+  // Each op kind ROUNDS times (creates twice), a delta and a fresh snapshot per pull, and the setup come to about 180
   // requests in sequence: about 1 s on an idle machine, but past vitest's default 5 s when the machine is busy enough
-  // to slow it fivefold. 30 s is about 30 times the idle time (it took 12 s on a CPU core shared with twelve busy
-  // loops).
+  // to slow it fivefold. 30 s is about 25 times the idle time (the 155-request run took 12 s on a CPU core shared
+  // with twelve busy loops).
   it("merged into a /api/state snapshot, equals a fresh /api/state for every caller", { timeout: 30_000 }, async () => {
-    const R = rng(20261007);
+    const R = rng(20261106);
     const O1 = uid("O1"), O2 = uid("O2");
     // O1's token both views (its scoped state and delta) and reports its own routine; O2 writes a second one.
     const o1 = agent((await mintToken("orchestrator", O1)).secret), o2 = agent((await mintToken("orchestrator", O2)).secret);
+    // A second fleet (docs/api.md "Fleets"): its orchestrator token views and posts its own items, and its routine
+    // O3 reports; the default fleet's orchestrator token ("manager" below) must see none of it.
+    const fa = agent((await mintFleetToken("fa")).secret), O3 = uid("O3");
+    const o3 = agent((await mintFleetToken("fa", "orchestrator", O3)).secret);
     const viewers: { name: string; get: (path: string) => Promise<{ status: number; body: any }> }[] = [
       { name: "admin", get: human.get },
       { name: "A", get: A.get },
       { name: "B", get: B.get },
       { name: "manager", get: agent((await mintToken("manager")).secret).get },
       { name: "orch O1", get: o1.get },
+      { name: "fleet fa", get: fa.get },
     ];
     const held = new Map<string, StateResponse>();
     for (const v of viewers) held.set(v.name, (await v.get("/api/state")).body);
@@ -398,6 +403,7 @@ describe("GET /api/state/delta", () => {
     };
     const createFor = turns([O1, O2, undefined]), moveTo = turns([O2, O1]), putOrch = turns([O1, O2]);
     const pinner = turns([A, B, human]), unpinner = turns([A, B, human]);
+    const moveFleet = turns(["fa", "default"]);
     // Only the run writes the lease and the schedule, so it keeps their latest copy from its own write results
     // instead of reading them before each write.
     const admin = held.get("admin")!;
@@ -458,6 +464,14 @@ describe("GET /api/state/delta", () => {
       async () => o2.post(`/api/reviews/runs/${stamp(tick++)}/start`, {}),
       async () => o2.post("/api/reviews/report", { stamp: stamp(tick++), result: R.pick(["ok", "failed"]), report: reportOf([7]) }),
       async () => human.del(`/api/reviews/${R.pick([O1, O2])}`),
+      // Fleets: fleet fa's token posts an item in its fleet, an admin moves one between fleets, fa's routine reports.
+      async () => {
+        const id = uid("f");
+        ids.push(id);
+        return fa.put(`/api/items/${id}`, { data: { type: "decision", title: id } });
+      },
+      async () => human.patch(`/api/items/${R.pick(ids)}`, { data: { fleet: moveFleet() } }),
+      async () => o3.post("/api/reviews/report", { stamp: stamp(tick++), result: "ok", report: reportOf([3]) }),
     ];
 
     // Each kind ROUNDS times (creates twice that, as deletes use them up), in a seeded shuffle; the first step

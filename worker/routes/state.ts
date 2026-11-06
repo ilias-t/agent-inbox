@@ -1,7 +1,7 @@
 // /api/me and /api/state: everything the UI needs on boot, in one snapshot.
 
 import type { Item, Lease, ManagerMeta, Orchestrator, Pins, RoutineState, Schedule, StateResponse } from "../../shared/types.ts";
-import { orchestratorScope } from "../auth.ts";
+import { fleetScope, orchestratorScope } from "../auth.ts";
 import { badRequest, json } from "../http.ts";
 import type { Ctx, Route } from "../router.ts";
 import { COLS, toDoc, type DocRow } from "../store.ts";
@@ -37,11 +37,15 @@ function archivedLimit(c: Ctx): number | null {
 async function state(c: Ctx): Promise<Response> {
   const db = c.env.DB;
   const scope = orchestratorScope(c.caller);
+  // A token sees its own fleet (docs/api.md "Fleets"); a manager token, its own items and doc in it.
+  const fleet = fleetScope(c.caller);
   const limit = archivedLimit(c);
   const sel = (where: string, ...binds: unknown[]) =>
     db.prepare(`SELECT ${COLS} FROM docs WHERE ${where} ORDER BY created_at, id`).bind(...binds);
-  const own = scope === null ? "" : " AND orchestrator = ?";
-  const ownBinds = scope === null ? [] : [scope];
+  const inFleet = fleet === undefined ? "" : " AND fleet IS ?";
+  const fleetBinds = fleet === undefined ? [] : [fleet];
+  const own = (scope === null ? "" : " AND orchestrator = ?") + inFleet;
+  const ownBinds = [...(scope === null ? [] : [scope]), ...fleetBinds];
   const itemQueries =
     limit === null
       ? [sel("collection = 'items'" + own, ...ownBinds)]
@@ -61,7 +65,9 @@ async function state(c: Ctx): Promise<Response> {
   >([
     db.prepare("SELECT coalesce(max(seq), 0) AS seq FROM changes"),
     db.prepare(`SELECT count(*) AS n FROM docs WHERE collection = 'items' AND status = 'archived'${own}`).bind(...ownBinds),
-    scope === null ? sel("collection = 'orchestrators'") : sel("collection = 'orchestrators' AND id = ?", scope),
+    scope === null
+      ? sel("collection = 'orchestrators'" + inFleet, ...fleetBinds)
+      : sel("collection = 'orchestrators' AND id = ?" + inFleet, scope, ...fleetBinds),
     sel("collection = 'meta' AND id IN ('manager', 'lease', 'schedule')"),
     // Orchestrator tokens see no people.
     db.prepare("SELECT email, name, ntfy_topic FROM users WHERE ?1 ORDER BY email").bind(scope === null ? 1 : 0),
@@ -71,8 +77,8 @@ async function state(c: Ctx): Promise<Response> {
       .bind(p.kind === "human" ? p.email.toLowerCase() : "", c.now),
     // The caller's own pins (migration 0010); tokens have none.
     db.prepare(PINS_SQL).bind(p.kind === "human" ? p.email.toLowerCase() : ""),
-    // Review routines (docs/reviews.md); an orchestrator token's own only.
-    db.prepare(routinesSql("?1")).bind(scope ?? ""),
+    // Review routines (docs/reviews.md); an orchestrator token's own only, a token's fleet's only.
+    fleet === undefined ? db.prepare(routinesSql("?1")).bind(scope ?? "") : db.prepare(routinesSql("?1", "?2")).bind(scope ?? "", fleet),
     ...itemQueries,
   ]);
   const itemDocs = itemRows.flatMap((r) => r.results);

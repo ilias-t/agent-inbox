@@ -32,7 +32,7 @@ describe("orchestrator token: allowed", () => {
     expect((await orch.get(`/api/orchestrators/${O}`)).status).toBe(200);
     expect((await orch.get("/api/schedule")).status).toBe(200);
     expect((await orch.get("/api/changes")).status).toBe(200);
-    expect((await orch.get("/api/me")).body).toEqual({ kind: "token", name: "o3-token", scope: "orchestrator", orchestrator: O });
+    expect((await orch.get("/api/me")).body).toEqual({ kind: "token", name: "o3-token", scope: "orchestrator", orchestrator: O, fleet: "default" });
   });
 
   it("creates and patches its own open items, and auto_decided with a decision", async () => {

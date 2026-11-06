@@ -3,7 +3,7 @@
 
 import { validChoices } from "../../shared/choices.ts";
 import { LEASE_SESSION_HEADER, type Doc, type Item, type ItemStatus, type ItemType, type QaMessage, type QaRole } from "../../shared/types.ts";
-import { orchestratorScope, requireFullRole, requireHuman, requireRole, type Caller } from "../auth.ts";
+import { orchestratorScope, requireFleet, requireFullRole, requireHuman, requireRole, type Caller } from "../auth.ts";
 import type { Env } from "../env.ts";
 import {
   badRequest,
@@ -17,6 +17,7 @@ import {
   optString,
   reqString,
 } from "../http.ts";
+import { deleteInFleet, fleetFilter, stampFleet } from "../fleets.ts";
 import { CLOSURE_FIELDS } from "../hooks/github.ts";
 import { notifyAnswer, notifyItemCreated, notifyReassigned } from "../notify.ts";
 import { docResponse, opRoute, type WriteOp } from "../ops.ts";
@@ -135,6 +136,7 @@ function dropSnooze(next: Record<string, unknown>): void {
 }
 
 function checkScopedRead(caller: Caller, item: Doc<Item>): void {
+  requireFleet(caller, item.data);
   const scope = orchestratorScope(caller);
   if (scope !== null && item.data.orchestrator !== scope) throw forbidden("Item belongs to another orchestrator");
 }
@@ -168,6 +170,12 @@ async function listItems(c: Ctx): Promise<Response> {
   if (orchestrator) {
     where.push("AND orchestrator = ?");
     binds.push(orchestrator);
+  }
+  // A token's own fleet, or a human's ?fleet=.
+  const fleet = fleetFilter(c.caller, q);
+  if (fleet !== undefined) {
+    where.push("AND fleet IS ?");
+    binds.push(fleet);
   }
   const qa = q.get("qa_pending");
   if (qa === "true") where.push("AND qa_pending = 1");
@@ -293,6 +301,7 @@ export function putItemOp(c: Ctx, id: string, body: Record<string, unknown>): Wr
       // A replace that omits status/type/created_at keeps the stored ones;
       // a create defaults them.
       const next: Record<string, unknown> = { ...input };
+      stampFleet(c.caller, cur?.data ?? null, next, true);
       next.status ??= cur?.data.status ?? "open";
       next.type ??= cur?.data.type ?? "info";
       next.created_at ??= cur?.data.created_at ?? c.now;
@@ -330,6 +339,7 @@ export function patchItemOp(c: Ctx, id: string, body: Record<string, unknown>): 
     build: (cur) => {
       if (!cur) throw notFound(`No item ${id}`);
       const next = mergePatch(cur.data, patch);
+      stampFleet(c.caller, cur.data, next, false);
       if (!("updated_at" in patch)) next.updated_at = c.now;
       dropSnooze(next);
       const item = validateItem(next, cur.data);
@@ -358,6 +368,7 @@ export function claimOp(c: Ctx, id: string, body: Record<string, unknown>): Writ
     ifVersion: ifVersion(body.if_version),
     build: async (cur) => {
       if (!cur) throw notFound(`No item ${id}`);
+      requireFleet(c.caller, cur.data);
       const d = cur.data, by = typeof d.claimed_by === "string" ? d.claimed_by : null;
       const retake = d.status === "processing" && session !== null && by !== session;
       if (d.status !== "decided" && !retake) throw conflict("not_decided", `Item is ${d.status}`, cur);
@@ -391,6 +402,7 @@ export function archiveOp(c: Ctx, id: string, body: Record<string, unknown>): Wr
     ifVersion: pin,
     build: (cur) => {
       if (!cur) throw notFound(`No item ${id}`);
+      requireFleet(c.caller, cur.data);
       if (scope !== null) {
         const d = cur.data;
         if (d.orchestrator !== scope) throw forbidden("Item belongs to another orchestrator");
@@ -422,6 +434,7 @@ export function withdrawOp(c: Ctx, id: string, body: Record<string, unknown>): W
     ifVersion: pin,
     build: (cur) => {
       if (!cur) throw notFound(`No item ${id}`);
+      requireFleet(c.caller, cur.data);
       const d = cur.data;
       if (scope !== null && d.orchestrator !== scope) throw forbidden("Item belongs to another orchestrator");
       if (d.status !== "open") throw conflict("not_open", `Item is ${d.status}`, cur);
@@ -484,7 +497,12 @@ async function snooze(c: Ctx): Promise<Response> {
 async function deleteItem(c: Ctx): Promise<Response> {
   requireFullRole(c.caller, "admin");
   const id = c.params.id;
-  const pin = ifVersion(c.url.searchParams.get("if_version"));
+  const asked = ifVersion(c.url.searchParams.get("if_version"));
+  await deleteInFleet(c, ITEMS, id, asked, (pin) => deleteItemPinned(c, id, pin), "Item");
+  return json({ ok: true });
+}
+
+async function deleteItemPinned(c: Ctx, id: string, pin: number | undefined): Promise<"deleted" | "missing"> {
   // The qa and everyone's snoozes and pins on it go first, while the item still exists
   // (the change-log trigger reads its orchestrator), under the same pin as the
   // item delete that follows in the same transaction: all happen or none does.
@@ -496,9 +514,7 @@ async function deleteItem(c: Ctx): Promise<Response> {
     `DELETE FROM snoozes WHERE item_id = ?1 AND EXISTS
        (SELECT 1 FROM docs WHERE collection = 'items' AND id = ?1 AND (?2 IS NULL OR version = ?2))`,
   ).bind(id, pin ?? null);
-  const r = await deleteDoc(c.env.DB, ITEMS, id, pin, [dropQa, dropSnoozes, dropPins(c.env.DB, "item", id, ITEMS, pin)]);
-  if (r === "missing") throw notFound(`No item ${id}`);
-  return json({ ok: true });
+  return deleteDoc(c.env.DB, ITEMS, id, pin, [dropQa, dropSnoozes, dropPins(c.env.DB, "item", id, ITEMS, pin)]);
 }
 
 // What a decision is bound to: the version the human saw (the page's
@@ -521,10 +537,12 @@ export async function decideItem(
   actor: string,
   now: string,
   pin: DecidePin = {},
+  caller?: Caller, // a token's decide stays in its own fleet; hooks pass none
 ): Promise<Doc<Item>> {
   if (choice === "other" && !note?.trim()) throw badRequest('choice "other" requires a note');
   const { doc } = await mutate<Item>(env.DB, ITEMS, id, { actor, now }, (cur) => {
     if (!cur) throw notFound(`No item ${id}`);
+    if (caller) requireFleet(caller, cur.data);
     const d = cur.data;
     if (d.status !== "open") throw conflict("not_open", `Item is ${d.status}`, cur);
     if (pin.createdAt !== undefined && cur.created_at !== pin.createdAt) {
@@ -560,7 +578,7 @@ async function decide(c: Ctx): Promise<Response> {
   const choice = reqString(body, "choice", 200);
   const note = optString(body, "note", 8000);
   const pin = { version: ifVersion(body.if_version) };
-  return json(await decideItem(c.env, c.params.id, choice, note, c.caller.actor, c.now, pin));
+  return json(await decideItem(c.env, c.params.id, choice, note, c.caller.actor, c.now, pin, c.caller));
 }
 
 // --- Q&A ---------------------------------------------------------------------
@@ -614,11 +632,13 @@ export function qaOp(c: Ctx, id: string, body: Record<string, unknown>): WriteOp
     ],
     build: (cur) => {
       if (!cur) throw notFound(`No item ${id}`);
+      requireFleet(c.caller, cur.data);
       if (scope !== null && cur.data.orchestrator !== scope) throw forbidden("Item belongs to another orchestrator");
       const next =
         role === "user"
           ? { ...cur.data, qa_pending: true, qa_last_at: now, updated_at: now }
           : { ...mergePatch(cur.data, patch), qa_pending: false, qa_answered_at: now, updated_at: now };
+      stampFleet(c.caller, cur.data, next, false);
       dropSnooze(next);
       const valid = validateItem(next, cur.data);
       checkScopedWrite(scope, cur.data, valid);

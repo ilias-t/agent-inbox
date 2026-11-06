@@ -58,7 +58,7 @@ describe("role resolution", () => {
   });
 
   it("tokens have no role", async () => {
-    expect((await agent(managerSecret).get("/api/me")).body).toEqual({ kind: "token", name: "mgr-users", scope: "manager" });
+    expect((await agent(managerSecret).get("/api/me")).body).toEqual({ kind: "token", name: "mgr-users", scope: "manager", fleet: "default" });
   });
 });
 

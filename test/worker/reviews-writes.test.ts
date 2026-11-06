@@ -360,13 +360,13 @@ describe("D1 statements per report", () => {
     return ran;
   }
 
-  it("is the same for 3 PRs and 45: the token lookup and one batch of five", async () => {
+  it("is the same for 3 PRs and 45: the token lookup, the routine's fleet and one batch of five", async () => {
     const r = await routine();
     const small = await countReport(r, { stamp: stamp(0), result: "ok", report: sampleReport(3) });
     const big = await countReport(r, { stamp: stamp(30), result: "ok", report: sampleReport(45) });
     console.log(`D1 statements for a 45-PR report: ${big.length} (${big.filter((s) => s.startsWith("batch:")).length} in its batch)`);
     expect(big.length).toBe(small.length);
-    expect(big.length).toBe(6);
+    expect(big.length).toBe(7);
     expect(big.filter((s) => s.startsWith("batch:"))).toHaveLength(5);
   });
 
@@ -388,7 +388,7 @@ describe("D1 statements per report", () => {
     );
     await waitOnExecutionContext(ctx);
     expect(res.status).toBe(200);
-    expect(ran).toHaveLength(7);
+    expect(ran).toHaveLength(8);
   });
 });
 

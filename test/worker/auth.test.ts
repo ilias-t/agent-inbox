@@ -63,7 +63,7 @@ describe("auth", () => {
   it("bearer tokens work on both prefixes; malformed or unknown ones are 401", async () => {
     const { secret, token } = await mintToken("manager", undefined, "mgr");
     expect(secret).toMatch(/^ait_[a-z2-7]{12}_[A-Za-z0-9_-]{43}$/);
-    expect((await agent(secret).get("/api/me")).body).toEqual({ kind: "token", name: "mgr", scope: "manager" });
+    expect((await agent(secret).get("/api/me")).body).toEqual({ kind: "token", name: "mgr", scope: "manager", fleet: "default" });
     expect((await call("GET", "/api/me", { host: HOST, token: secret })).status).toBe(200);
     expect((await call("GET", "/api/me", { host: HOST, token: secret.slice(0, -2) + "xx" })).status).toBe(401);
     expect((await call("GET", "/api/me", { host: HOST, token: "nope" })).status).toBe(401);

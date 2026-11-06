@@ -2,6 +2,7 @@
 
 import type { Change } from "../../shared/types.ts";
 import { orchestratorScope } from "../auth.ts";
+import { fleetChangesSql, fleetFilter } from "../fleets.ts";
 import { badRequest, json } from "../http.ts";
 import type { Ctx, Route } from "../router.ts";
 import { latestSeq } from "../store.ts";
@@ -24,6 +25,13 @@ const COLLECTION_FILTERS: Record<string, string> = {
 // 0002), so deletes and reassigned items keep their history. Filtered in SQL
 // before the LIMIT so a page of others' changes can't hide its own.
 const SCOPE_FILTER = "AND orchestrator = ?1";
+
+// Fleets (docs/api.md "Fleets"): the triggers record each change's fleet too
+// (migration 0012). A token sees its own fleet's rows (a manager token those
+// of its own orchestrator id in it); a human, every fleet, or one with
+// ?fleet=, as that fleet's orchestrator token sees it. ?4 is the fleet.
+const FLEET_FILTER = `AND ${fleetChangesSql("?4")}`;
+const MANAGER_FLEET_FILTER = "AND fleet IS ?4";
 
 // Snoozes and pins are one human's own (migrations 0007, 0010): only that
 // human's feed shows them, so teammates' pages don't refetch and no token
@@ -49,12 +57,14 @@ async function changes(c: Ctx): Promise<Response> {
     throw badRequest(`collection must be one of ${Object.keys(COLLECTION_FILTERS).join(", ")}`);
   }
   const scope = orchestratorScope(c.caller);
+  const fleet = fleetFilter(c.caller, q);
+  const fleetSql = fleet === undefined ? "" : scope !== null ? MANAGER_FLEET_FILTER : FLEET_FILTER;
   const sql = `SELECT seq, collection, doc_id, op, version, status, actor, at FROM changes
-    WHERE seq > ?2 ${collection ? COLLECTION_FILTERS[collection] : ""} ${scope !== null ? SCOPE_FILTER : ""} ${SNOOZE_FILTER}
+    WHERE seq > ?2 ${collection ? COLLECTION_FILTERS[collection] : ""} ${scope !== null ? SCOPE_FILTER : ""} ${fleetSql} ${SNOOZE_FILTER}
     ORDER BY seq LIMIT ${PAGE}`;
   const p = c.caller.principal;
   const self = p.kind === "human" ? `human:${p.email.toLowerCase()}` : "";
-  const stmt = db.prepare(sql).bind(scope ?? "", Math.floor(since), self);
+  const stmt = db.prepare(sql).bind(scope ?? "", Math.floor(since), self, ...(fleet === undefined ? [] : [fleet]));
 
   // A long-poll the client has abandoned (tab hidden, navigation, network
   // drop) stops querying D1 straight away rather than at its deadline. The

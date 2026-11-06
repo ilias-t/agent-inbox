@@ -72,6 +72,9 @@ export interface Item {
   claimed_at?: string;
   claimed_by?: string;
   reclaimed_from?: string | null;
+  // The fleet it belongs to (docs/api.md "Fleets"); absent for the default fleet. Stamped by the server on token
+  // writes; only an admin human moves it.
+  fleet?: string;
   [extra: string]: unknown;
 }
 
@@ -86,6 +89,7 @@ export interface QaMessage {
 
 export interface Orchestrator {
   id?: string;
+  fleet?: string; // as on Item: absent for the default fleet
   goal?: string;
   status?: string; // proposed · approved · running · blocked · pr-open · parked · done · dropped
   headline?: string;
@@ -305,8 +309,15 @@ export interface UsersResponse {
 export type Principal =
   // is_admin (role === "admin") is kept for clients from before roles.
   | { kind: "human"; email: string; role: Role; is_admin: boolean }
-  | { kind: "token"; name: string; scope: "manager" }
-  | { kind: "token"; name: string; scope: "orchestrator"; orchestrator: string };
+  // fleet: the token's fleet, "default" for the default fleet (docs/api.md "Fleets"). Optional: a Worker from
+  // before fleets doesn't send it.
+  | { kind: "token"; name: string; scope: "manager"; fleet?: string }
+  | { kind: "token"; name: string; scope: "orchestrator"; orchestrator: string; fleet?: string };
+
+// How the API names the default fleet: the fleet of every doc and token that has none (docs/api.md "Fleets").
+export const DEFAULT_FLEET = "default";
+// A named fleet's id; "default" is reserved.
+export const FLEET_ID_RE = /^[a-z][a-z0-9-]{0,31}$/;
 
 export interface TokenInfo {
   id: string;

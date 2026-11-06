@@ -1,7 +1,8 @@
 // /api/reviews: a review routine's runs, PRs and events (docs/reviews.md). The routine is always the writing
 // token's orchestrator id: only that token starts and reports its runs, and nothing in a body or path names
 // the routine it writes. Every human and the manager read every routine; an orchestrator token reads its own.
-// Admins can delete a routine (a dry-run one, typically).
+// A routine belongs to the fleet of the token that first wrote it (docs/api.md "Fleets"): a token of another
+// fleet neither reads nor writes it. Admins can delete a routine (a dry-run one, typically).
 
 import {
   reportPayloadProblems,
@@ -25,7 +26,7 @@ import type {
   ReviewStartPayload,
   RoutineReviewsResponse,
 } from "../../shared/types.ts";
-import { orchestratorScope, requireAdmin, requireHuman, requireRole, type Caller } from "../auth.ts";
+import { fleetScope, orchestratorScope, requireAdmin, requireHuman, requireRole, type Caller } from "../auth.ts";
 import { badRequest, conflict, forbidden, json, notFound, readJson } from "../http.ts";
 import {
   bodySha,
@@ -58,26 +59,36 @@ function invalid(problems: string[]): never {
 }
 
 // The routine a write is for: the token's own orchestrator id. Humans and the manager never write runs.
-function writer(caller: Caller): string {
-  const routine = orchestratorScope(caller);
+async function writer(c: Ctx): Promise<string> {
+  const routine = orchestratorScope(c.caller);
   if (routine === null) throw forbidden("Only a routine's own orchestrator token writes its reviews");
+  await requireRoutineFleet(c, routine);
   return routine;
 }
 
 // Humans and the manager read every routine; an orchestrator token only its own.
-function requireReader(caller: Caller, routine: string): void {
-  const scope = orchestratorScope(caller);
+async function requireReader(c: Ctx, routine: string): Promise<void> {
+  const scope = orchestratorScope(c.caller);
   if (scope !== null && scope !== routine) throw forbidden("Not this token's routine");
+  await requireRoutineFleet(c, routine);
+}
+
+// A token reads and writes only a routine of its own fleet; one nobody has written yet is anyone's to create.
+async function requireRoutineFleet(c: Ctx, routine: string): Promise<void> {
+  const fleet = fleetScope(c.caller);
+  if (fleet === undefined) return;
+  const row = await c.env.DB.prepare("SELECT fleet FROM review_routines WHERE routine = ?").bind(routine).first<{ fleet: string | null }>();
+  if (row && row.fleet !== fleet) throw forbidden("Routine belongs to another fleet");
 }
 
 async function start(c: Ctx): Promise<Response> {
-  const routine = writer(c.caller);
+  const routine = await writer(c);
   const stamp = c.params.stamp;
   const body = await c.body();
   const problems = startPayloadProblems(stamp, body);
   if (problems.length) invalid(problems);
   const db = c.env.DB;
-  const results = await db.batch<RunRow>(startStatements(db, { routine, actor: c.caller.actor, now: c.now, stamp, body: body as ReviewStartPayload }));
+  const results = await db.batch<RunRow>(startStatements(db, { routine, actor: c.caller.actor, now: c.now, fleet: fleetScope(c.caller) ?? null, stamp, body: body as ReviewStartPayload }));
   const row = results[results.length - 1].results[0];
   if (row) return json(toRun(row), 201);
   // Already there (a retried start, or one that arrived after its report): as stored, nothing written.
@@ -87,14 +98,14 @@ async function start(c: Ctx): Promise<Response> {
 }
 
 async function report(c: Ctx): Promise<Response> {
-  const routine = writer(c.caller);
+  const routine = await writer(c);
   const body = await readJson(c.request, REVIEWS_BODY_LIMIT);
   const problems = reportPayloadProblems(body);
   if (problems.length) invalid(problems);
   const payload = body as unknown as ReviewReportPayload;
   const sha = await bodySha(body);
   const db = c.env.DB;
-  const stmts = reportStatements(db, { routine, actor: c.caller.actor, now: c.now, sha, payload });
+  const stmts = reportStatements(db, { routine, actor: c.caller.actor, now: c.now, fleet: fleetScope(c.caller) ?? null, sha, payload });
   const results = await db.batch<RunRow>(stmts);
   const row = results[results.length - 1].results[0];
   if (row) {
@@ -113,27 +124,31 @@ async function report(c: Ctx): Promise<Response> {
 async function list(c: Ctx): Promise<Response> {
   const db = c.env.DB;
   const scope = orchestratorScope(c.caller) ?? "";
-  const own = "(?1 = '' OR routine = ?1)";
+  // A token's own fleet's routines (?2); every one for a human.
+  const fleet = fleetScope(c.caller);
+  const binds = fleet === undefined ? [scope] : [scope, fleet];
+  const inFleet = fleet === undefined ? "" : " AND routine IN (SELECT routine FROM review_routines WHERE fleet IS ?2)";
+  const own = `(?1 = '' OR routine = ?1)${inFleet}`;
   const [heads, last, running, counts] = await db.batch<any>([
-    db.prepare(`SELECT ${HEAD_COLS} FROM review_routines WHERE ${own} ORDER BY routine`).bind(scope),
+    db.prepare(`SELECT ${HEAD_COLS} FROM review_routines WHERE ${own} ORDER BY routine`).bind(...binds),
     db
       .prepare(
         `SELECT r.routine, r.stamp, r.result, r.finished_at, json_extract(r.data, '$.headline') AS headline
          FROM review_routines AS h JOIN review_runs AS r ON r.routine = h.routine AND r.stamp = h.last_stamp
-         WHERE (?1 = '' OR h.routine = ?1)`,
+         WHERE (?1 = '' OR h.routine = ?1)${fleet === undefined ? "" : " AND h.fleet IS ?2"}`,
       )
-      .bind(scope),
+      .bind(...binds),
     // A run started after the newest finished one; the newest such per routine.
     db
       .prepare(
         `SELECT r.routine, max(r.stamp) AS stamp, r.started_at FROM review_runs AS r JOIN review_routines AS h ON h.routine = r.routine
-         WHERE r.result = 'running' AND r.stamp > coalesce(h.last_stamp, '') AND (?1 = '' OR h.routine = ?1)
+         WHERE r.result = 'running' AND r.stamp > coalesce(h.last_stamp, '') AND (?1 = '' OR h.routine = ?1)${fleet === undefined ? "" : " AND h.fleet IS ?2"}
          GROUP BY r.routine`,
       )
-      .bind(scope),
+      .bind(...binds),
     db
       .prepare(`SELECT routine, status, count(*) AS n, sum(needs_you) AS ny FROM review_prs WHERE gone_at IS NULL AND ${own} GROUP BY routine, status`)
-      .bind(scope),
+      .bind(...binds),
   ]);
   const routines = (heads.results as HeadRow[]).map((h): ReviewRoutineSummary => {
     const l = last.results.find((r: { routine: string }) => r.routine === h.routine);
@@ -164,7 +179,7 @@ function pageParams(c: Ctx): { before: string; limit: number } {
 
 async function routineView(c: Ctx): Promise<Response> {
   const routine = c.params.routine;
-  requireReader(c.caller, routine);
+  await requireReader(c, routine);
   const { before, limit } = pageParams(c);
   const db = c.env.DB;
   const goneSince = new Date(Date.parse(c.now) - GONE_SHOWN_MS).toISOString();
@@ -193,7 +208,7 @@ async function routineView(c: Ctx): Promise<Response> {
 
 async function prView(c: Ctx): Promise<Response> {
   const routine = c.params.routine;
-  requireReader(c.caller, routine);
+  await requireReader(c, routine);
   const n = Number(c.params.n);
   if (!/^\d{1,9}$/.test(c.params.n) || n < 1) throw badRequest("The PR number must be a positive integer");
   const db = c.env.DB;
@@ -213,7 +228,7 @@ async function prView(c: Ctx): Promise<Response> {
 
 async function runView(c: Ctx): Promise<Response> {
   const { routine, stamp } = c.params;
-  requireReader(c.caller, routine);
+  await requireReader(c, routine);
   if (!STAMP_RE.test(stamp)) throw badRequest('The stamp must look like "2026-10-08T180000Z"');
   const row = await getRun(c.env.DB, routine, stamp);
   if (!row) throw notFound(`No run ${routine}/${stamp}`);
@@ -307,7 +322,7 @@ async function createRunRequest(c: Ctx): Promise<Response> {
 
 async function getRunRequest(c: Ctx): Promise<Response> {
   const routine = c.params.routine;
-  requireReader(c.caller, routine);
+  await requireReader(c, routine);
   const h = await headOf(c.env.DB, routine);
   if (!h) throw notFound(`No reviews for ${routine}`);
   return json({ request: toHead(h).run_request } satisfies ReviewRunRequestResponse);
@@ -316,7 +331,7 @@ async function getRunRequest(c: Ctx): Promise<Response> {
 // The routine's own token reports how its request went. A retry of the update it already made answers the request
 // as stored; any other move is 409 with it, and a request another one replaced is 404.
 async function updateRunRequest(c: Ctx): Promise<Response> {
-  const routine = writer(c.caller);
+  const routine = await writer(c);
   const id = c.params.id;
   const body = await c.body();
   const problems = runRequestUpdateProblems(body);

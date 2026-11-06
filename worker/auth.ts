@@ -4,7 +4,7 @@
 // (browsers), else DEV_NO_ACCESS on localhost only.
 
 import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from "jose";
-import type { Principal, Role } from "../shared/types.ts";
+import { DEFAULT_FLEET, type Principal, type Role } from "../shared/types.ts";
 import type { Env } from "./env.ts";
 import { forbidden, HttpError, safeEqual, sha256Hex, unauthorized } from "./http.ts";
 import { atLeast, resolveRole } from "./users.ts";
@@ -15,6 +15,9 @@ export interface Caller {
   // False for Access/dev callers, whose browser attaches credentials to
   // cross-site requests too; those get the CSRF checks in index.ts.
   bearer: boolean;
+  // Tokens only: the fleet the token is bound to, null for the default fleet (docs/api.md "Fleets"). Humans
+  // have none: they see every fleet.
+  fleet?: string | null;
 }
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1"]);
@@ -61,6 +64,7 @@ interface TokenRow {
   name: string;
   scope: "manager" | "orchestrator";
   orchestrator: string | null;
+  fleet: string | null;
   secret_hash: string;
   last_used_at: string | null;
 }
@@ -69,7 +73,7 @@ async function bearerCaller(raw: string, env: Env, ctx: ExecutionContext): Promi
   const m = TOKEN_RE.exec(raw);
   if (!m) throw unauthorized("Malformed token");
   const row = await env.DB.prepare(
-    "SELECT id, name, scope, orchestrator, secret_hash, last_used_at FROM tokens WHERE id = ? AND revoked_at IS NULL",
+    "SELECT id, name, scope, orchestrator, fleet, secret_hash, last_used_at FROM tokens WHERE id = ? AND revoked_at IS NULL",
   )
     .bind(m[1])
     .first<TokenRow>();
@@ -86,11 +90,14 @@ async function bearerCaller(raw: string, env: Env, ctx: ExecutionContext): Promi
         .catch((e) => console.error("last_used_at", e)),
     );
   }
+  // NULL is the default fleet. A stored value no fleet id can have (only a hand-edited row holds one) matches no
+  // doc: the token then sees and writes nothing that belongs to a fleet, rather than everything.
+  const fleet = row.fleet;
   const principal: Principal =
     row.scope === "orchestrator"
-      ? { kind: "token", name: row.name, scope: "orchestrator", orchestrator: row.orchestrator ?? "" }
-      : { kind: "token", name: row.name, scope: "manager" };
-  return { principal, actor: `token:${row.name}`, bearer: true };
+      ? { kind: "token", name: row.name, scope: "orchestrator", orchestrator: row.orchestrator ?? "", fleet: fleet ?? DEFAULT_FLEET }
+      : { kind: "token", name: row.name, scope: "manager", fleet: fleet ?? DEFAULT_FLEET };
+  return { principal, actor: `token:${row.name}`, bearer: true, fleet };
 }
 
 // The human's role from the users table (worker/users.ts says how it resolves).
@@ -143,6 +150,32 @@ export function checkCsrf(c: Caller, request: Request, url: URL): void {
 export function orchestratorScope(c: Caller): string | null {
   const p = c.principal;
   return p.kind === "token" && p.scope === "orchestrator" ? p.orchestrator : null;
+}
+
+// --- Fleets (docs/api.md "Fleets") ---------------------------------------------
+
+// The fleet a token is bound to (null: the default fleet), or undefined for a human, who sees every fleet.
+export function fleetScope(c: Caller): string | null | undefined {
+  return c.principal.kind === "token" ? (c.fleet ?? null) : undefined;
+}
+
+// A doc's fleet as stored: data.fleet (an own property), null when absent (the default fleet). Any other
+// value is kept as it is, so it matches no token's fleet, as in SQL (`fleet IS ?`).
+export function docFleet(data: object | null | undefined): unknown {
+  return data && Object.hasOwn(data, "fleet") ? (data as Record<string, unknown>).fleet : null;
+}
+
+// 403 when a token reads or writes a doc of another fleet. Humans pass.
+export function requireFleet(c: Caller, data: object | null | undefined, what = "Item"): void {
+  const f = fleetScope(c);
+  if (f !== undefined && docFleet(data) !== f) throw forbidden(`${what} belongs to another fleet`);
+}
+
+// The SQL condition limiting a fleet column (`col`, as stored) to the caller's fleet, with its bind: none for
+// a human. `fleet IS ?` with a null bind matches the default fleet.
+export function fleetWhere(c: Caller, col = "fleet"): { sql: string; binds: unknown[] } {
+  const f = fleetScope(c);
+  return f === undefined ? { sql: "", binds: [] } : { sql: ` AND ${col} IS ?`, binds: [f] };
 }
 
 // Human or manager token.
