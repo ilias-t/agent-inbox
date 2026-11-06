@@ -60,24 +60,26 @@ function fleetArg(value, flag = "--fleet") {
 
 // --fleet <id>: a filter for callers who see more than one fleet (people). A token sees only its own fleet, so
 // naming another is an error rather than a filter the server would quietly ignore; naming its own is a no-op. A
-// person's named fleet must exist on the server: one from before fleets would ignore the filter and answer with
-// every item. `me` saves a call when the caller already has it. Both errors exit 1.
-async function fleetFilter(ctx, me) {
+// person's named fleet must be in the server's registry: a server without one may ignore the filter and answer
+// with every item (`registry: false` skips this, for `state`, which checks the fleet in what it read). `me` saves a
+// call when the caller already has it. Both errors exit 1.
+async function fleetFilter(ctx, me, { registry = true } = {}) {
   const want = ctx.values.fleet;
   if (want === undefined) return undefined;
   fleetArg(want);
   const own = fleetOf(me ?? (await ctx.api("GET", "/api/me")));
   if (own !== null && own !== want) throw new Error(`this token belongs to fleet ${own}, so it sees only that fleet (not ${want})`);
-  if (own === null && want !== DEFAULT_FLEET) {
+  if (registry && own === null && want !== DEFAULT_FLEET) {
     try {
       await ctx.api("GET", `/api/fleets/${enc(want)}`);
     } catch (err) {
-      if (err instanceof ApiError && err.status === 404) throw new Error(`no fleet ${want} on this server`);
+      if (err instanceof ApiError && err.status === 404) throw new Error(noFleet(want));
       throw err;
     }
   }
   return want;
 }
+const noFleet = (fleet) => `no fleet ${fleet} on this server (or the server has no fleet registry, so --fleet can't be checked)`;
 
 // The fleet a doc belongs to, as the API names it.
 const docFleet = (doc) => (doc?.data?.fleet == null ? DEFAULT_FLEET : doc.data.fleet);
@@ -245,7 +247,7 @@ export const COMMANDS = [
     run: async (ctx) => {
       if (ctx.values.fleet !== undefined) fleetArg(ctx.values.fleet);
       const s = await ctx.api("GET", "/api/state");
-      const fleet = await fleetFilter(ctx, s.me);
+      const fleet = await fleetFilter(ctx, s.me, { registry: false }); // stateOfFleet checks it in s.fleets
       ctx.print(fleet === undefined ? s : stateOfFleet(s, fleet), (r) => stateText(r, ctx.now()));
     },
   },
@@ -869,7 +871,7 @@ function stateOfFleet(s, fleet) {
   const items = s.items.filter((d) => docFleet(d) === fleet);
   const top = fleet === (fleetOf(s.me) ?? DEFAULT_FLEET) ? { manager: s.manager, lease: s.lease, schedule: s.schedule } : null;
   const own = s.fleets?.[fleet] ?? top;
-  if (!own) throw new Error(`no fleet ${fleet} on this server`);
+  if (!own) throw new Error(noFleet(fleet));
   return {
     ...s,
     items,

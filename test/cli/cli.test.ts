@@ -1075,7 +1075,9 @@ describe("fleets", () => {
     const d = JSON.parse((await run(["state", "--fleet", "default", "--json"])).stdout);
     expect(d.items.map((x: { id: string }) => x.id)).toEqual(["d1"]);
     expect((await run(["state", "--fleet", "side-a"])).stdout).toContain("fleet: side-a");
+    seen = [];
     expect((await run(["state", "--fleet", "nope"])).code).toBe(1);
+    expect(seen.map((x) => x.path)).toEqual(["/agent/api/state"]); // checked in what /api/state sent, no extra call
   });
 
   it("state --fleet <own> works for a named fleet's token, from the top-level status it gets", async () => {
@@ -1119,10 +1121,18 @@ describe("fleets", () => {
           : { body: { items: [], changes: [], cursor: 1 } };
     const r = await run(["items", "--fleet", "side-a"]);
     expect(r.code).toBe(1);
-    expect(r.stderr).toBe("agent-inbox: no fleet side-a on this server\n");
+    expect(r.stderr).toBe("agent-inbox: no fleet side-a on this server (or the server has no fleet registry, so --fleet can't be checked)\n");
     expect(seen.some((x) => x.path.startsWith("/agent/api/items"))).toBe(false);
     // The default fleet needs no check: on such a server every item is the default fleet's.
     expect((await run(["items", "--fleet", "default"])).code).toBe(0);
+    // A server without the registry answers the check with the router's own 404: the same refusal.
+    handler = (req) =>
+      req.path === "/agent/api/me"
+        ? { body: { kind: "human", email: "a@b.c", role: "admin", is_admin: true } }
+        : req.path.startsWith("/agent/api/fleets/")
+          ? { status: 404, body: { error: "not_found", message: "No route GET /api/fleets/side-a" } }
+          : { body: { items: [] } };
+    expect((await run(["changes", "--since", "1", "--fleet", "side-a"])).code).toBe(1);
   });
 
   it("wait --fleet filters its first poll too", async () => {

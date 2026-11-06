@@ -8,10 +8,12 @@ import { PERSIST_TO, ROOT, serverEnv } from "./support/data.ts";
 
 const exec = promisify(execFile);
 
-// `agent-inbox <args>` with `token` (any config on this machine ignored): its exit code and output.
-async function cli(token: string, args: string[]): Promise<{ code: number; stdout: string; stderr: string }> {
+// `agent-inbox <args>` with `token` (any config on this machine ignored): its exit code and output. Without a token:
+// the local person (DEV_NO_ACCESS), on the plain /api URL.
+async function cli(token: string | null, args: string[]): Promise<{ code: number; stdout: string; stderr: string }> {
+  const target = token ? ["--url", serverEnv().baseURL + "/agent", "--token", token] : ["--url", serverEnv().baseURL];
   try {
-    const { stdout, stderr } = await exec(process.execPath, [resolve(ROOT, "bin/agent-inbox.mjs"), ...args, "--url", serverEnv().baseURL + "/agent", "--token", token], {
+    const { stdout, stderr } = await exec(process.execPath, [resolve(ROOT, "bin/agent-inbox.mjs"), ...args, ...target], {
       cwd: ROOT, env: { ...process.env, AGENT_INBOX_CONFIG: resolve(PERSIST_TO, "no-cli-config.json"), AGENT_INBOX_URL: "", AGENT_INBOX_TOKEN: "" },
     });
     return { code: 0, stdout, stderr };
@@ -48,4 +50,25 @@ test("a fleet's orchestrator token checks its fleet, lists it, and sets its own 
 
   // Another fleet's filter is refused rather than quietly ignored.
   expect((await cli(token, ["items", "--fleet", "default"])).code).toBe(1);
+});
+
+test("a person lists every fleet and filters by one", async ({ request }) => {
+  const fleet = `cli-p-${Date.now().toString(36)}`;
+  expect((await request.put(`/api/fleets/${fleet}`, { data: { data: { label: "Person view" } } })).status()).toBe(201);
+  const minted = await request.post("/api/tokens", { data: { name: `orch-${fleet}`, scope: "manager", fleet } });
+  const token = (await minted.json()).secret as string;
+  expect((await cli(token, ["post", `${fleet}-ask`, "--type", "info", "--title", "From the fleet"])).code).toBe(0);
+
+  const listed = await cli(null, ["fleets"]);
+  expect(listed.code, listed.stderr).toBe(0);
+  expect(listed.stdout).toMatch(/^default\n/);
+  expect(listed.stdout).toContain(`${fleet}  "Person view"`);
+
+  const items = await cli(null, ["items", "--fleet", fleet, "--json"]);
+  expect(items.code, items.stderr).toBe(0);
+  expect(JSON.parse(items.stdout).items.map((d: { id: string }) => d.id)).toEqual([`${fleet}-ask`]);
+  const state = JSON.parse((await cli(null, ["state", "--fleet", fleet, "--json"])).stdout);
+  expect(state.items.map((d: { id: string }) => d.id)).toEqual([`${fleet}-ask`]);
+  expect(state.schedule.inherited).toBe(true);
+  expect((await cli(null, ["items", "--fleet", "no-such-fleet"])).code).toBe(1);
 });
