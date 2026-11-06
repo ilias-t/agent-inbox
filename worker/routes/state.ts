@@ -1,6 +1,18 @@
 // /api/me and /api/state: everything the UI needs on boot, in one snapshot.
 
-import type { Item, Lease, ManagerMeta, Orchestrator, Pins, RoutineState, Schedule, StateResponse } from "../../shared/types.ts";
+import {
+  DEFAULT_FLEET,
+  type Fleet,
+  type FleetState,
+  type Item,
+  type Lease,
+  type ManagerMeta,
+  type Orchestrator,
+  type Pins,
+  type RoutineState,
+  type Schedule,
+  type StateResponse,
+} from "../../shared/types.ts";
 import { fleetScope, orchestratorScope } from "../auth.ts";
 import { badRequest, json } from "../http.ts";
 import type { Ctx, Route } from "../router.ts";
@@ -19,6 +31,34 @@ export const ARCHIVED_MAX = 1000;
 // One human's pins as /api/state and the delta send them: "<kind>:<ref>" → pinned at. ?1 is their email.
 export const PINS_SQL = "SELECT kind || ':' || ref AS key, created_at FROM pins WHERE email = ?1 ORDER BY kind, ref";
 export const pinMap = (rows: { key: string; created_at: string }[]): Pins => Object.fromEntries(rows.map((r) => [r.key, r.created_at]));
+
+// Every fleet's registry doc, and every meta doc a fleet's entry in the `fleets` map takes its status, lease and
+// schedule from (a few primary-key ranges). People only.
+export const FLEETS_SQL = `SELECT ${COLS} FROM docs WHERE collection = 'fleets'
+  UNION ALL SELECT ${COLS} FROM docs WHERE collection = 'meta' AND (id IN ('manager', 'lease', 'schedule')
+    OR id GLOB 'manager:*' OR id GLOB 'lease:*' OR id GLOB 'schedule:*')`;
+
+// /api/state `fleets` (docs/api.md "Session"), from FLEETS_SQL's rows: `default` and every registered fleet, each
+// with its own status, lease and schedule view, as its orchestrator token sees them. The delta picks parts of it.
+export function fleetsMap(rows: DocRow[], now: Date): Record<string, FleetState> {
+  const docs = new Map(rows.map((r) => [`${r.collection}\u0000${r.id}`, r]));
+  const doc = <T,>(collection: string, id: string) => {
+    const row = docs.get(`${collection}\u0000${id}`);
+    return row ? toDoc<T>(row) : null;
+  };
+  const registered = new Set([DEFAULT_FLEET, ...rows.filter((r) => r.collection === "fleets").map((r) => r.id)]);
+  const out: Record<string, FleetState> = {};
+  for (const id of [...registered].sort()) {
+    const f = id === DEFAULT_FLEET ? null : id;
+    out[id] = {
+      doc: doc<Fleet>("fleets", id),
+      manager: doc<ManagerMeta>("meta", metaId("manager", f)),
+      lease: doc<Lease>("meta", metaId("lease", f)),
+      schedule: fleetScheduleView(f, f === null ? null : doc<Schedule>("meta", metaId("schedule", f)), doc<Schedule>("meta", "schedule"), now),
+    };
+  }
+  return out;
+}
 
 // A row of routinesSql, as the wire type (D1 rows carry only these columns, but a fresh object keeps it exact).
 export const routineState = (r: RoutineState): RoutineState => ({ id: r.id, version: r.version, last_run_at: r.last_run_at, result: r.result });
@@ -63,7 +103,7 @@ async function state(c: Ctx): Promise<Response> {
         ];
   // One batch is one transaction, so the cursor matches the docs exactly.
   const p = c.caller.principal;
-  const [cursor, archivedCount, orchs, meta, users, snoozes, pins, routines, ...itemRows] = await db.batch<
+  const [cursor, archivedCount, orchs, meta, users, snoozes, pins, routines, fleetRows, ...itemRows] = await db.batch<
     DocRow & UserRow & RoutineState & { seq: number; n: number; item_id: string; until: string; key: string; created_at: string }
   >([
     db.prepare("SELECT coalesce(max(seq), 0) AS seq FROM changes"),
@@ -84,6 +124,8 @@ async function state(c: Ctx): Promise<Response> {
     db.prepare(PINS_SQL).bind(p.kind === "human" ? p.email.toLowerCase() : ""),
     // Review routines (docs/reviews.md); an orchestrator token's own only, a token's fleet's only.
     fleet === undefined ? db.prepare(routinesSql("?1")).bind(scope ?? "") : db.prepare(routinesSql("?1", "?2")).bind(scope ?? "", fleet),
+    // Every fleet's entry (people only; tokens see their own fleet's alone, in manager, lease and schedule).
+    db.prepare(`SELECT * FROM (${FLEETS_SQL}) WHERE ?1`).bind(p.kind === "human" ? 1 : 0),
     ...itemQueries,
   ]);
   const itemDocs = itemRows.flatMap((r) => r.results);
@@ -110,6 +152,7 @@ async function state(c: Ctx): Promise<Response> {
     archived_more: archivedShown < archivedTotal,
     routines: routines.results.map(routineState),
   };
+  if (p.kind === "human") body.fleets = fleetsMap(fleetRows.results, new Date(c.now));
   return json(body);
 }
 

@@ -8,8 +8,10 @@ export const SNAPSHOT_ARCHIVED = 100;
 // Older than this, the snapshot shown at boot is marked as a saved copy until it's revalidated.
 export const STALE_MS = 10 * 60 * 1000;
 
+// v2: /api/state gained `fleets` for people, which a delta only updates part by part, so a snapshot saved before
+// it (v1) is dropped and the next open fetches the whole state once.
 export interface Snapshot {
-  v: 1;
+  v: 2;
   savedAt: number; // ms
   state: StateResponse;
 }
@@ -30,7 +32,7 @@ export function capSnapshot(s: StateResponse, n = SNAPSHOT_ARCHIVED): StateRespo
 }
 
 export function toSnapshot(s: StateResponse, now: number): Snapshot {
-  return { v: 1, savedAt: now, state: capSnapshot(s) };
+  return { v: 2, savedAt: now, state: capSnapshot(s) };
 }
 
 export function isStale(savedAt: number, now: number): boolean {
@@ -39,7 +41,7 @@ export function isStale(savedAt: number, now: number): boolean {
 
 function valid(x: unknown): x is Snapshot {
   const s = x as Snapshot | null;
-  return !!s && s.v === 1 && typeof s.savedAt === "number" && !!s.state && typeof s.state.cursor === "number"
+  return !!s && s.v === 2 && typeof s.savedAt === "number" && !!s.state && typeof s.state.cursor === "number"
     && Array.isArray(s.state.items) && Array.isArray(s.state.orchestrators) && !!s.state.me;
 }
 

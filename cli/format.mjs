@@ -154,7 +154,8 @@ export function principalText(p) {
     const role = p.role ? ` (${p.role})` : p.is_admin === false ? " (not an admin)" : "";
     return `human ${p.email}${role}`;
   }
-  return `token ${p.name} (${p.scope}${p.orchestrator ? ` ${p.orchestrator}` : ""})`;
+  // fleet: the token's fleet ("default" included); absent from a server before fleets.
+  return `token ${p.name} (${p.scope}${p.orchestrator ? ` ${p.orchestrator}` : ""})${p.fleet ? ` fleet ${p.fleet}` : ""}`;
 }
 
 // GET /api/users: "email  role  name" per person.

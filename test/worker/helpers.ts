@@ -127,9 +127,21 @@ export function person(email: string, vars: Record<string, string | undefined> =
   };
 }
 
-// A token bound to a fleet (docs/api.md "Fleets"; null: the default fleet). No route mints one yet, so this
-// sets tokens.fleet directly, as an admin's SQL would.
+// Registers a fleet (docs/api.md "Fleets registry") unless it is already, as an admin's SQL would.
+export async function registerFleet(fleet: string) {
+  const now = new Date().toISOString();
+  await env.DB.prepare(
+    "INSERT INTO docs (collection, id, data, created_at, updated_at, updated_by) VALUES ('fleets', ?, '{}', ?, ?, 'test') ON CONFLICT DO NOTHING",
+  )
+    .bind(fleet, now, now)
+    .run();
+}
+
+// A token bound to a fleet (docs/api.md "Fleets"; null: the default fleet), its fleet registered. It sets
+// tokens.fleet directly, as an admin's SQL would, so a test can bind any token to any fleet (or to a value that
+// isn't a fleet id, which isn't registered); fleet-registry.test.ts mints through the API.
 export async function mintFleetToken(fleet: string | null, scope: "manager" | "orchestrator" = "manager", orchestrator?: string) {
+  if (fleet !== null && /^[a-z][a-z0-9-]{0,31}$/.test(fleet) && fleet !== "default") await registerFleet(fleet);
   const t = await mintToken(scope, orchestrator);
   await env.DB.prepare("UPDATE tokens SET fleet = ? WHERE id = ?").bind(fleet, t.token.id).run();
   return t;

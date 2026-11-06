@@ -17,7 +17,7 @@ import {
   optString,
   reqString,
 } from "../http.ts";
-import { deleteInFleet, fleetFilter, stampFleet } from "../fleets.ts";
+import { deleteInFleet, fleetFilter, registeredTarget, requireMoveRegistered, stampFleet } from "../fleets.ts";
 import { CLOSURE_FIELDS } from "../hooks/github.ts";
 import { notifyAnswer, notifyItemCreated, notifyReassigned } from "../notify.ts";
 import { docResponse, opRoute, type WriteOp } from "../ops.ts";
@@ -172,7 +172,7 @@ async function listItems(c: Ctx): Promise<Response> {
     binds.push(orchestrator);
   }
   // A token's own fleet, or a human's ?fleet=.
-  const fleet = fleetFilter(c.caller, q);
+  const fleet = await registeredTarget(c, fleetFilter(c.caller, q));
   if (fleet !== undefined) {
     where.push(orchestrator ? "AND +fleet IS ?" : "AND fleet IS ?"); // with orchestrator: stay on docs_orchestrator
     binds.push(fleet);
@@ -298,11 +298,12 @@ export function putItemOp(c: Ctx, id: string, body: Record<string, unknown>): Wr
     id,
     ifVersion: ifVersion(body.if_version),
     authorize: (cur) => checkScopedRead(c.caller, cur),
-    build: (cur) => {
+    build: async (cur) => {
       // A replace that omits status/type/created_at keeps the stored ones;
       // a create defaults them.
       const next: Record<string, unknown> = { ...input };
       stampFleet(c.caller, cur?.data ?? null, next, true);
+      await requireMoveRegistered(c, cur?.data ?? null, next);
       next.status ??= cur?.data.status ?? "open";
       next.type ??= cur?.data.type ?? "info";
       next.created_at ??= cur?.data.created_at ?? c.now;
@@ -338,10 +339,11 @@ export function patchItemOp(c: Ctx, id: string, body: Record<string, unknown>): 
     id,
     ifVersion: ifVersion(body.if_version),
     authorize: (cur) => checkScopedRead(c.caller, cur),
-    build: (cur) => {
+    build: async (cur) => {
       if (!cur) throw notFound(`No item ${id}`);
       const next = mergePatch(cur.data, patch);
       stampFleet(c.caller, cur.data, next, false);
+      await requireMoveRegistered(c, cur.data, next);
       if (!("updated_at" in patch)) next.updated_at = c.now;
       dropSnooze(next);
       const item = validateItem(next, cur.data);
@@ -648,7 +650,7 @@ export function qaOp(c: Ctx, id: string, body: Record<string, unknown>): WriteOp
          SELECT ?, ?, ?, 1, ?, ?, ? WHERE ${landedClause}`,
       ).bind(qaColl, msgId, JSON.stringify(message), now, now, actor, ITEMS, id, version, now, actor),
     ],
-    build: (cur) => {
+    build: async (cur) => {
       if (!cur) throw notFound(`No item ${id}`);
       requireFleet(c.caller, cur.data);
       if (scope !== null && cur.data.orchestrator !== scope) throw forbidden("Item belongs to another orchestrator");
@@ -657,6 +659,7 @@ export function qaOp(c: Ctx, id: string, body: Record<string, unknown>): WriteOp
           ? { ...cur.data, qa_pending: true, qa_last_at: now, updated_at: now }
           : { ...mergePatch(cur.data, patch), qa_pending: false, qa_answered_at: now, updated_at: now };
       stampFleet(c.caller, cur.data, next, false);
+      await requireMoveRegistered(c, cur.data, next);
       dropSnooze(next);
       const valid = validateItem(next, cur.data);
       checkScopedWrite(scope, cur.data, valid);

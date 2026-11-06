@@ -146,3 +146,37 @@ export function resolveMetaId(c: Caller, id: string): string {
   const f = fleetScope(c);
   return f && (id === "manager" || id === "lease" || id === "schedule") ? metaId(id, f) : id;
 }
+
+// --- The fleet registry (docs/api.md "Fleets registry") ----------------------------------------------------------
+
+// 400 unless a fleet a person named is registered (a `fleets/<id>` doc exists); the default fleet (null) always is.
+// Fleets are never deleted (there is no DELETE /api/fleets), so this read before a write can't be outdated by the
+// time the write lands: keep it that way, or every caller of this needs the check inside its write.
+export async function requireRegistered(db: D1Database, fleet: string | null): Promise<void> {
+  if (fleet === null) return;
+  const row = await db.prepare("SELECT 1 AS ok FROM docs WHERE collection = 'fleets' AND id = ?").bind(fleet).first();
+  if (!row) throw badRequest(`No fleet ${fleet}: create it first (Settings, or PUT /api/fleets/${fleet})`);
+}
+
+// A fleet a person names for a route (targetFleet's or fleetFilter's result) checked against the registry; a
+// token's own (forced, checked when it was minted) passes, as does "every fleet" (undefined).
+export async function registeredTarget<F extends string | null | undefined>(c: Ctx, fleet: F): Promise<F> {
+  if (fleet !== undefined && fleetScope(c.caller) === undefined) await requireRegistered(c.env.DB, fleet);
+  return fleet;
+}
+
+// For a person's write of an item or manager doc (inside its build, after stampFleet): a move to another fleet
+// must name a registered one. A value the write leaves as stored passes, registered or not.
+export async function requireMoveRegistered(c: Ctx, cur: object | null, next: Record<string, unknown>): Promise<void> {
+  if (fleetScope(c.caller) !== undefined || !Object.hasOwn(next, "fleet")) return;
+  const to = next.fleet;
+  if (to === null || to === undefined) return;
+  if (cur !== null && Object.hasOwn(cur, "fleet") && (cur as Record<string, unknown>).fleet === to) return;
+  await requireRegistered(c.env.DB, to as string);
+}
+
+// A named fleet in a person's per-fleet meta id (`meta/manager:fa`) must be registered before it is written.
+export async function requireMetaRegistered(c: Ctx, id: string): Promise<void> {
+  const named = metaFleet(id);
+  if (named && fleetScope(c.caller) === undefined) await requireRegistered(c.env.DB, named.fleet);
+}

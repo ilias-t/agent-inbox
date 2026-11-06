@@ -255,6 +255,16 @@ describe("requests", () => {
     expect((await run(["me"])).stdout).toBe("human bob@example.com\n");
   });
 
+  it("me prints a token's scope and fleet", async () => {
+    handler = () => ({ body: { kind: "token", name: "orch", scope: "manager", fleet: "side-a" } });
+    expect((await run(["me"])).stdout).toBe("token orch (manager) fleet side-a\n");
+    handler = () => ({ body: { kind: "token", name: "orch-O3", scope: "orchestrator", orchestrator: "O3", fleet: "default" } });
+    expect((await run(["me"])).stdout).toBe("token orch-O3 (orchestrator O3) fleet default\n");
+    // A server from before fleets.
+    handler = () => ({ body: { kind: "token", name: "orch", scope: "manager" } });
+    expect((await run(["me"])).stdout).toBe("token orch (manager)\n");
+  });
+
   it("users lists people and their roles (read-only: roles are set in Settings)", async () => {
     handler = () => ({
       body: { users: [{ email: "boss@example.com", name: "Boss", role: "admin" }, { email: "vic@example.com", role: "viewer" }] },

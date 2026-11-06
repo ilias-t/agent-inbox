@@ -13,15 +13,16 @@ import type {
   StateDelta,
   StateDeltaReset,
 } from "../../shared/types.ts";
+import { DEFAULT_FLEET, type FleetState } from "../../shared/types.ts";
 import { fleetScope, orchestratorScope } from "../auth.ts";
-import { fleetChangesSql, metaId } from "../fleets.ts";
+import { fleetChangesSql, metaFleet, metaId } from "../fleets.ts";
 import { badRequest, json } from "../http.ts";
 import type { Ctx, Route } from "../router.ts";
 import { COLS, toDoc, type DocRow } from "../store.ts";
 import { routinesSql } from "../reviews.ts";
 import { toPerson } from "../users.ts";
 import { fleetScheduleView } from "./schedule.ts";
-import { PINS_SQL, pinMap, routineState } from "./state.ts";
+import { FLEETS_SQL, fleetsMap, PINS_SQL, pinMap, routineState } from "./state.ts";
 
 // At most this many change rows after `since`; further behind, a full /api/state is the cheaper read.
 export const DELTA_MAX_CHANGES = 500;
@@ -113,6 +114,23 @@ function visibleDocs(view: View): string {
 const META_SQL = `SELECT ${COLS} FROM docs WHERE collection = 'meta'
   AND id IN (coalesce('manager:' || ?6, 'manager'), coalesce('lease:' || ?6, 'lease'), 'schedule', 'schedule:' || ?6)`;
 
+// A change to any part of a fleet's entry in /api/state `fleets`: its registry doc, or a meta doc it reads (the bare
+// ids are the default fleet's, and meta/schedule is also the hours every fleet without its own inherits).
+const FLEET_PART = `(collection = 'fleets' OR (collection = 'meta' AND (doc_id IN ('manager', 'lease', 'schedule')
+  OR doc_id GLOB 'manager:*' OR doc_id GLOB 'lease:*' OR doc_id GLOB 'schedule:*')))`;
+
+// Which fleet's entry, and which part of it, a change to (collection, id) touches: fleet "*" for every fleet, part
+// "all" for the whole entry (a registry doc's change, which is how a new fleet first reaches a page).
+type FleetPart = "all" | "manager" | "lease" | "schedule";
+function fleetTouched(collection: string, id: string): { fleet: string; part: FleetPart } | undefined {
+  if (collection === "fleets") return { fleet: id, part: "all" };
+  if (collection !== "meta") return undefined;
+  if (id === "schedule") return { fleet: "*", part: "schedule" }; // the hours every fleet without its own inherits
+  if (id === "manager" || id === "lease") return { fleet: DEFAULT_FLEET, part: id };
+  const named = metaFleet(id);
+  return named ? { fleet: named.fleet ?? DEFAULT_FLEET, part: named.base as FleetPart } : undefined;
+}
+
 const D_COLS = COLS.split(", ").map((col) => `d.${col}`).join(", ");
 
 async function delta(c: Ctx): Promise<Response> {
@@ -129,7 +147,7 @@ async function delta(c: Ctx): Promise<Response> {
   // `+fleet` beside orchestrator keeps a manager token's count on docs_orchestrator (its few items).
   const own = view === "manager" ? " AND orchestrator = ?2 AND +fleet IS ?6" : view === "all" ? "" : " AND fleet IS ?6";
 
-  const [top, keys, docs, users, snoozes, pins, routines, meta] = await db.batch<any>([
+  const [top, keys, docs, users, snoozes, pins, routines, meta, fleetRows] = await db.batch<any>([
     stmt(`SELECT head.cursor, ok.ok,
       CASE WHEN ${archivedMayChange(view)}
         THEN (SELECT count(*) FROM docs WHERE collection = 'items' AND status = 'archived'${own}) END AS archived
@@ -149,6 +167,8 @@ async function delta(c: Ctx): Promise<Response> {
     stmt(`SELECT * FROM (${routinesSql("?2", view === "all" ? undefined : "?6")}) WHERE EXISTS (SELECT 1 FROM ch WHERE collection = 'reviews') ORDER BY id`),
     // The caller's meta docs, when one of them is in ch.
     stmt(`${META_SQL} AND EXISTS (SELECT 1 FROM ch WHERE collection = 'meta')`),
+    // People's `fleets` map, when part of it is in ch.
+    stmt(`SELECT * FROM (${FLEETS_SQL}) WHERE ${view === "all" ? `EXISTS (SELECT 1 FROM ch WHERE ${FLEET_PART})` : "0"}`),
   ]);
   // The ids this caller's manager, lease and schedule have (a person's: the default fleet's).
   const mine = fleet ?? null;
@@ -170,7 +190,10 @@ async function delta(c: Ctx): Promise<Response> {
   if (archived !== null) body.archived_total = archived;
   const qa = new Set<string>();
   const reviews: string[] = [];
+  const fleetParts: { fleet: string; part: FleetPart }[] = [];
   for (const { collection, doc_id: id } of keys.results as { collection: string; doc_id: string }[]) {
+    const touched = view === "all" ? fleetTouched(collection, id) : undefined;
+    if (touched !== undefined) fleetParts.push(touched);
     if (collection === "items" || collection === "orchestrators") {
       const row = found(collection, id);
       if (!row) body.deleted.push({ collection, id });
@@ -206,6 +229,20 @@ async function delta(c: Ctx): Promise<Response> {
   if (reviews.length) {
     body.reviews_changed = reviews; // keys come sorted
     body.routines = routines.results.map(routineState);
+  }
+  // Each touched fleet's changed parts only (a lease renewal carries the lease, not the digest beside it); a fleet
+  // whose registry doc changed comes whole. Fleets that aren't registered are left out, as in /api/state.
+  if (fleetParts.length) {
+    const map = fleetsMap(fleetRows.results as DocRow[], new Date(c.now));
+    const whole = new Set(fleetParts.filter((t) => t.part === "all").map((t) => t.fleet));
+    const out: Record<string, Partial<FleetState>> = {};
+    for (const { fleet, part } of fleetParts) {
+      for (const id of fleet === "*" ? Object.keys(map) : [fleet]) {
+        if (!map[id]) continue;
+        out[id] = whole.has(id) ? map[id] : { ...out[id], [part]: map[id][part as Exclude<FleetPart, "all">] };
+      }
+    }
+    if (Object.keys(out).length) body.fleets = out;
   }
   return json(body);
 }

@@ -31,6 +31,8 @@ node scripts/create-token.mjs --name orch-O3 --scope orchestrator --orchestrator
 
 The token (`ait_<id>_<secret>`) is printed once; D1 keeps only the SHA-256 of the secret. A live token's name must be unique (the change log records writers as `token:<name>`). Revoke from the UI.
 
+Each token belongs to one fleet ([api.md](api.md) "Fleets"), the default fleet unless you pick another: a registered fleet (Settings → Fleets) in the token form, or `--fleet <id>` on the script (`--create-fleet` also registers it, for a deployment without the UI). A manager token belongs to the fleet that owns its manager id, so leave the fleet out for it; naming another one is refused. `agent-inbox me` prints the token's fleet.
+
 | Token | Can |
 |---|---|
 | `manager` | Every item, qa, manager, meta, lease, schedule and change-feed operation, including decide. Not: tokens, roles (`PUT`/`DELETE /api/users`), snoozing, Web Push or `/api/people/me`, which are humans' |

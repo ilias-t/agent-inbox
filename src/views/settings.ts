@@ -1,4 +1,7 @@
-import { ROLES, type Doc, type Role, type Schedule, type TokenInfo, type UserInfo } from "../../shared/types.ts";
+import {
+  DEFAULT_FLEET, FLEET_COLOR_RE, FLEET_ID_RE, FLEET_LABEL_MAX, FLEET_PREFIX_RE, ROLES,
+  type Doc, type Fleet, type Role, type Schedule, type TokenInfo, type UserInfo,
+} from "../../shared/types.ts";
 import { DAYS, PICKUP_INTERVALS, computeSchedule, parseWorkHours, validateSchedule } from "../../shared/schedule.ts";
 import { $, announce, esc, toast } from "../lib/dom.ts";
 import { ROLE_HELP, canAct, isAdminRole, isLastAdmin, personNotes, removePrompt, sortUsers } from "../lib/roles.ts";
@@ -9,7 +12,7 @@ import type { PushSupport } from "../lib/push.ts";
 import { devicePushState, devicePushSupport, disableDevicePush, enableDevicePush } from "../pwa.ts";
 import { skeleton } from "./rows.ts";
 
-/* ---------- settings: schedule, agent tokens, people, notifications, account ---------- */
+/* ---------- settings: schedule, fleets, agent tokens, people, notifications, account ---------- */
 // The page is built once per visit (and again when the viewer's role changes); live state refreshes only touch the
 // account line, and refill the schedule form when it has no unsaved edits, so typing is never clobbered by a poll.
 // Only admins edit the schedule, manage tokens and set people's roles; everyone else sees the schedule read-only,
@@ -32,7 +35,14 @@ const push = {
 const tok = {
   list: null as TokenInfo[] | null, failed: "", busy: false, msg: "", kind: "",
   name: "", scope: "manager" as "manager" | "orchestrator", orch: "",
+  // "": a manager token's own manager id decides (the server's rule); else "default" or a fleet id.
+  fleet: DEFAULT_FLEET as string,
   created: null as { name: string; secret: string } | null,
+};
+// Settings → Fleets (admins): the registry, and the form that adds a fleet or edits the one picked (`editing`).
+const flt = {
+  list: null as Doc<Fleet>[] | null, failed: "", busy: false, msg: "", kind: "",
+  editing: null as string | null, id: "", label: "", color: "", prefix: "",
 };
 // Settings → People (admins): everyone with a row or Web Push devices, the add form's fields, and the line under them.
 const ppl = {
@@ -62,13 +72,14 @@ export function renderSettingsPage(box: HTMLElement): void {
     return;
   }
   state.shownSig = "settings"; builtFor = String(myRole());
-  sched.dirty = false; sched.msg = ""; tok.created = null; tok.msg = ""; prof.msg = ""; push.msg = ""; ppl.msg = "";
+  sched.dirty = false; sched.msg = ""; tok.created = null; tok.msg = ""; prof.msg = ""; push.msg = ""; ppl.msg = ""; flt.msg = "";
   for (const k of Object.keys(spoken)) delete spoken[k];
   const human = state.me?.kind === "human";
   // Phones, once Reviews has Team's place in the bottom bar: Team from here (style.css shows it only then).
   box.innerHTML = '<article class="show settings"><h2 id="page-title" tabindex="-1">Settings</h2>' +
     '<a class="teamlink" href="#team"><span class="tlbl">Team</span><span class="tsub">The managers and their briefings</span><span class="chev" aria-hidden="true">&rsaquo;</span></a>' +
     '<section class="panel stack" aria-labelledby="sched-h"><p class="slabel" id="sched-h">Schedule</p>' + scheduleForm() + "</section>" +
+    (isAdmin() && human ? '<section class="panel stack" aria-labelledby="fleet-h"><p class="slabel" id="fleet-h">Fleets</p><div class="stack" id="fleet-body"></div></section>' : "") +
     '<section class="panel stack" aria-labelledby="tok-h"><p class="slabel" id="tok-h">Agent tokens</p><div id="tok-body"></div></section>' +
     (human ? '<section class="panel stack" aria-labelledby="ppl-h"><p class="slabel" id="ppl-h">People</p><div class="stack" id="ppl-body"></div></section>' : "") +
     (human ? '<section class="panel stack" aria-labelledby="me-h"><p class="slabel" id="me-h">Notifications</p><div class="stack" id="push-body"></div><div class="subsec" id="me-body"></div></section>' : "") +
@@ -77,6 +88,7 @@ export function renderSettingsPage(box: HTMLElement): void {
   wireSchedule();
   fillSchedule();
   renderAccount();
+  if (isAdmin() && human) { renderFleets(); loadFleets(); }
   if (isAdmin()) { renderTokens(); loadTokens(); }
   else { tok.list = null; tok.failed = "Only admins manage agent tokens."; renderTokens(); }
   if (human) {
@@ -208,8 +220,10 @@ async function loadTokens(): Promise<void> {
 }
 function tokenRow(t: TokenInfo): string {
   const scope = t.scope === "orchestrator" ? "manager · " + (t.orchestrator || "?") : "orchestrator";
+  const fleet = t.fleet && t.fleet !== DEFAULT_FLEET ? t.fleet : "";
   return '<div class="tokrow' + (t.revoked_at ? " revoked" : "") + '"><div class="tokmain">' +
-    '<span class="tokname">' + esc(t.name) + '</span><span class="badge ' + (t.scope === "manager" ? "running" : "pr-open") + '">' + esc(scope) + "</span></div>" +
+    '<span class="tokname">' + esc(t.name) + '</span><span class="badge ' + (t.scope === "manager" ? "running" : "pr-open") + '">' + esc(scope) + "</span>" +
+    (fleet ? '<span class="badge proposed">' + swatch(fleetColor(fleet)) + "fleet " + esc(fleet) + "</span>" : "") + "</div>" +
     '<div class="tokmeta">' + (t.revoked_at ? "<span>revoked " + relSpan(t.revoked_at) + "</span>" : "") +
     "<span>" + (t.last_used_at ? "used " + relSpan(t.last_used_at) : "never used") + "</span>" +
     "<span>created " + relSpan(t.created_at) + "</span><span class=\"mono\">" + esc(t.id) + "</span></div>" +
@@ -245,6 +259,9 @@ function renderTokens(): void {
       '<div class="field" id="tok-orch-field"' + (tok.scope === "orchestrator" ? "" : " hidden") + '><label class="flabel" for="tok-orch">Manager id</label>' +
       '<input class="inp" id="tok-orch" list="orch-list" maxlength="64" placeholder="O3" spellcheck="false" autocapitalize="characters" value="' + esc(tok.orch) + '">' +
       '<datalist id="orch-list">' + orchIds.map((id) => '<option value="' + esc(id) + '"></option>').join("") + "</datalist></div>" +
+      '<div class="field"><label class="flabel" for="tok-fleet">Fleet</label><select class="inp" id="tok-fleet" aria-describedby="tok-fleet-note">' +
+      fleetOptions() + "</select>" +
+      '<p class="small-note" id="tok-fleet-note">A token reads and writes only its fleet\'s items and managers. A manager token belongs to the fleet that owns its manager id.</p></div>' +
       '<div class="actions"><button type="submit" class="btn primary" id="tok-create"' + (tok.busy ? " disabled" : "") + ">" + (tok.busy ? "Working…" : "Create token") + "</button></div>" +
       '<div class="status' + (tok.kind ? " " + tok.kind : "") + '">' + esc(tok.msg) + "</div></form>";
   }
@@ -261,10 +278,20 @@ function wireTokens(body: HTMLElement): void {
   document.getElementById("tok-done")?.addEventListener("click", () => { tok.created = null; renderTokens(); });
   body.querySelectorAll<HTMLButtonElement>("[data-revoke]").forEach((b) => b.addEventListener("click", () => revoke(b.dataset.revoke || "", b.dataset.name || "")));
   const form = document.getElementById("tok-form") as HTMLFormElement | null; if (!form) return;
-  const name = inp("tok-name"), scope = $<HTMLSelectElement>("tok-scope"), orch = inp("tok-orch");
+  const name = inp("tok-name"), scope = $<HTMLSelectElement>("tok-scope"), orch = inp("tok-orch"), fleet = $<HTMLSelectElement>("tok-fleet");
   name.addEventListener("input", () => { tok.name = name.value; });
   orch.addEventListener("input", () => { tok.orch = orch.value; });
-  scope.addEventListener("change", () => { tok.scope = scope.value === "orchestrator" ? "orchestrator" : "manager"; $("tok-orch-field").hidden = tok.scope !== "orchestrator"; });
+  fleet.addEventListener("change", () => { tok.fleet = fleet.value; });
+  scope.addEventListener("change", () => {
+    tok.scope = scope.value === "orchestrator" ? "orchestrator" : "manager";
+    $("tok-orch-field").hidden = tok.scope !== "orchestrator";
+    // "From its manager id" is a manager token's choice only; a manager token starts on it.
+    const inherit = fleet.querySelector<HTMLOptionElement>('option[value=""]');
+    if (inherit) inherit.hidden = inherit.disabled = tok.scope !== "orchestrator";
+    if (tok.scope === "orchestrator" && tok.fleet === DEFAULT_FLEET) tok.fleet = "";
+    if (tok.scope === "manager" && tok.fleet === "") tok.fleet = DEFAULT_FLEET;
+    fleet.value = tok.fleet;
+  });
   form.addEventListener("submit", async (ev) => {
     ev.preventDefault();
     if (tok.busy) return;
@@ -273,13 +300,14 @@ function wireTokens(body: HTMLElement): void {
     if (tok.scope === "orchestrator" && !o) { tok.msg = "A manager token needs the manager id (O3)."; tok.kind = "err"; renderTokens(); return; }
     tok.busy = true; tok.msg = ""; tok.kind = ""; renderTokens();
     try {
-      const r = await store.createToken(n, tok.scope, tok.scope === "orchestrator" ? o : null);
+      const r = await store.createToken(n, tok.scope, tok.scope === "orchestrator" ? o : null, tok.fleet || null);
       tok.created = { name: r.token.name, secret: r.secret };
       tok.list = (tok.list || []).concat([r.token]);
       tok.name = ""; tok.orch = "";
     } catch (e) {
       tok.kind = "err";
-      // 400: bad input; 409: a live token already has the name. Both explain themselves.
+      // 400: bad input or an unknown fleet; 409: a live token already has the name, or the manager id is another
+      // fleet's. All explain themselves.
       tok.msg = e instanceof ApiError && (e.status === 400 || e.status === 409) ? "Couldn't create it: " + e.message : "Couldn't create the token. Try again.";
     }
     tok.busy = false; renderTokens();
@@ -297,6 +325,110 @@ async function revoke(id: string, name: string): Promise<void> {
     tok.msg = "Couldn't revoke the token. Try again."; tok.kind = "err";
   }
   tok.busy = false; renderTokens();
+}
+
+/* ----- fleets (/api/fleets): admins add and label them; tokens are minted for one above ----- */
+// The fleets an admin can mint for: the registry when loaded, else the ids /api/state knows.
+function fleetIds(): string[] {
+  const ids = flt.list ? flt.list.map((f) => f.id) : Object.keys(state.base?.fleets ?? {});
+  return [...new Set([DEFAULT_FLEET, ...ids])].sort((a, b) => (a === DEFAULT_FLEET ? -1 : b === DEFAULT_FLEET ? 1 : a.localeCompare(b)));
+}
+function fleetDoc(id: string): Doc<Fleet> | null {
+  return flt.list?.find((f) => f.id === id) ?? state.base?.fleets?.[id]?.doc ?? null;
+}
+function fleetColor(id: string): string { return fleetDoc(id)?.data.color ?? ""; }
+// A colour dot. SVG fill rather than a style attribute: the page's CSP has no inline styles.
+function swatch(color: string): string {
+  if (!FLEET_COLOR_RE.test(color)) return "";
+  return '<svg class="swatch" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="6" fill="' + esc(color) + '"/></svg>';
+}
+function fleetName(id: string): string {
+  const label = fleetDoc(id)?.data.label;
+  const base = id === DEFAULT_FLEET ? "Default" : id;
+  return label && label !== base ? base + " (" + label + ")" : base;
+}
+function fleetOptions(): string {
+  const opt = (value: string, text: string, hidden = false) =>
+    '<option value="' + esc(value) + '"' + (tok.fleet === value ? " selected" : "") + (hidden ? " hidden disabled" : "") + ">" + esc(text) + "</option>";
+  return opt("", "From its manager id", tok.scope !== "orchestrator") + fleetIds().map((id) => opt(id, fleetName(id))).join("");
+}
+
+async function loadFleets(): Promise<void> {
+  try { flt.list = await store.listFleets(); flt.failed = ""; }
+  catch { flt.failed = "Couldn't load fleets."; }
+  renderFleets();
+  // The token form's fleet choices, without rebuilding the form (someone may be typing in it).
+  const sel = document.getElementById("tok-fleet") as HTMLSelectElement | null;
+  if (sel) { sel.innerHTML = fleetOptions(); sel.value = tok.fleet; }
+}
+function fleetRow(f: Doc<Fleet>): string {
+  const d = f.data;
+  return '<div class="tokrow"><div class="tokmain">' + swatch(d.color ?? "") +
+    '<span class="tokname">' + esc(f.id === DEFAULT_FLEET ? "Default" : f.id) + "</span>" +
+    (d.label ? "<span>" + esc(d.label) + "</span>" : "") + "</div>" +
+    '<div class="tokmeta">' + (d.id_prefix ? "<span>manager ids " + esc(d.id_prefix) + "1, " + esc(d.id_prefix) + "2…</span>" : "") +
+    "<span>added " + relSpan(f.created_at) + "</span></div>" +
+    '<button type="button" class="btn" data-fleet-edit="' + esc(f.id) + '"' + (flt.busy ? " disabled" : "") + ">Edit</button></div>";
+}
+function renderFleets(): void {
+  const body = document.getElementById("fleet-body"); if (!body) return;
+  let h = '<p class="small-note">A fleet is one orchestrator, its managers and their items. Add one here, then mint its orchestrator token below with the fleet picked. People see every fleet; a token only its own.</p>';
+  if (flt.failed) h += '<div class="status err">' + esc(flt.failed) + "</div>";
+  else if (!flt.list) h += '<div class="skel"><div class="bar"></div></div>';
+  else if (flt.list.length) h += '<div class="rows toklist">' + flt.list.map(fleetRow).join("") + "</div>";
+  else h += '<div class="rows"><div class="empty compact"><span class="small">Only the default fleet so far.</span></div></div>';
+  const editing = flt.editing;
+  h += '<form class="sform" id="fleet-form" autocomplete="off"><p class="slabel">' + (editing ? "Edit fleet " + esc(editing) : "New fleet") + "</p>" +
+    '<div class="frow2"><div class="field"><label class="flabel" for="fleet-id">Id</label><input class="inp" id="fleet-id" maxlength="32" required spellcheck="false" autocapitalize="none" placeholder="side-a" value="' + esc(flt.id) + '"' + (editing ? " readonly" : "") + "></div>" +
+    '<div class="field"><label class="flabel" for="fleet-label">Label</label><input class="inp" id="fleet-label" maxlength="' + FLEET_LABEL_MAX + '" placeholder="Side project A" value="' + esc(flt.label) + '"></div></div>' +
+    '<div class="frow2"><div class="field"><label class="flabel" for="fleet-color">Colour</label><input class="inp" id="fleet-color" maxlength="7" spellcheck="false" placeholder="#3b82f6" value="' + esc(flt.color) + '"></div>' +
+    '<div class="field"><label class="flabel" for="fleet-prefix">Manager id prefix</label><input class="inp" id="fleet-prefix" maxlength="8" spellcheck="false" placeholder="S" value="' + esc(flt.prefix) + '"></div></div>' +
+    '<div class="actions"><button type="submit" class="btn primary" id="fleet-save"' + (flt.busy ? " disabled" : "") + ">" + (flt.busy ? "Working…" : editing ? "Save fleet" : "Add fleet") + "</button>" +
+    (editing ? '<button type="button" class="btn" id="fleet-cancel">Cancel</button>' : "") + "</div>" +
+    '<div class="status' + (flt.kind ? " " + flt.kind : "") + '">' + esc(flt.msg) + "</div></form>";
+  body.innerHTML = h;
+  wireFleets(body);
+  speak("fleet", flt.msg);
+}
+function wireFleets(body: HTMLElement): void {
+  body.querySelectorAll<HTMLButtonElement>("[data-fleet-edit]").forEach((b) => b.addEventListener("click", () => {
+    const f = flt.list?.find((x) => x.id === b.dataset.fleetEdit); if (!f) return;
+    Object.assign(flt, { editing: f.id, id: f.id, label: f.data.label ?? "", color: f.data.color ?? "", prefix: f.data.id_prefix ?? "", msg: "", kind: "" });
+    renderFleets();
+    inp("fleet-label").focus();
+  }));
+  document.getElementById("fleet-cancel")?.addEventListener("click", () => {
+    Object.assign(flt, { editing: null, id: "", label: "", color: "", prefix: "", msg: "", kind: "" });
+    renderFleets();
+  });
+  const form = document.getElementById("fleet-form") as HTMLFormElement | null; if (!form) return;
+  for (const [id, key] of [["fleet-id", "id"], ["fleet-label", "label"], ["fleet-color", "color"], ["fleet-prefix", "prefix"]] as const) {
+    const el = inp(id); el.addEventListener("input", () => { flt[key] = el.value; });
+  }
+  form.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    if (flt.busy) return;
+    const id = flt.id.trim(), label = flt.label.trim(), color = flt.color.trim(), prefix = flt.prefix.trim();
+    const problem =
+      id !== DEFAULT_FLEET && !FLEET_ID_RE.test(id) ? "The id is lowercase letters, numbers and -, starting with a letter (up to 32)." :
+      color && !FLEET_COLOR_RE.test(color) ? "The colour is #rrggbb, like #3b82f6." :
+      prefix && !FLEET_PREFIX_RE.test(prefix) ? "The prefix is a letter, then up to 7 letters or numbers." : "";
+    if (problem) { flt.msg = problem; flt.kind = "err"; renderFleets(); return; }
+    flt.busy = true; flt.msg = ""; flt.kind = ""; renderFleets();
+    try {
+      const cur = flt.editing ? flt.list?.find((f) => f.id === flt.editing) : undefined;
+      if (cur) await store.patchFleet(id, { label: label || null, color: color || null, id_prefix: prefix || null }, cur.version);
+      else await store.putFleet(id, { ...(label ? { label } : {}), ...(color ? { color } : {}), ...(prefix ? { id_prefix: prefix } : {}) }, 0);
+      flt.msg = (cur ? "Saved " : "Added ") + id + "."; flt.kind = "ok";
+      Object.assign(flt, { editing: null, id: "", label: "", color: "", prefix: "" });
+    } catch (e) {
+      flt.kind = "err";
+      flt.msg = e instanceof ApiError && e.status === 409 ? "That fleet changed or already exists: reload and try again." :
+        e instanceof ApiError && e.status === 400 ? "Couldn't save it: " + e.message : "Couldn't save the fleet. Try again.";
+    }
+    flt.busy = false;
+    await loadFleets();
+  });
 }
 
 /* ----- people and roles (/api/users): admins set them; everyone else sees their own ----- */

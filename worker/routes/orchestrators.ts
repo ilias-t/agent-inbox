@@ -4,8 +4,8 @@
 // create an id owns it.
 
 import type { Orchestrator } from "../../shared/types.ts";
-import { fleetWhere, orchestratorScope, requireFleet, requireFull, requireFullRole, requireRole, type Caller } from "../auth.ts";
-import { deleteInFleet, stampFleet } from "../fleets.ts";
+import { fleetScope, fleetWhere, orchestratorScope, requireFleet, requireFull, requireFullRole, requireRole, type Caller } from "../auth.ts";
+import { deleteInFleet, requireMoveRegistered, stampFleet } from "../fleets.ts";
 import { badRequest, forbidden, ifVersion, isObject, json, notFound } from "../http.ts";
 import { docResponse, opRoute, type WriteOp } from "../ops.ts";
 import type { Ctx, Route } from "../router.ts";
@@ -43,6 +43,24 @@ async function get(c: Ctx): Promise<Response> {
   return json(doc);
 }
 
+// A token creating a manager doc can't take an id another fleet owns through a review routine or a live manager token
+// (docs/api.md "Fleets": manager ids stay global; minting reads the same owners). A read, not part of the write: a
+// mint racing this create can at worst leave a token whose writes its doc refuses, never one that reaches another
+// fleet. Stricter than the mint's order of owners on purpose: any holder in another fleet refuses (after an admin
+// move, revoke the old fleet's token first).
+async function requireIdFree(c: Ctx, id: string): Promise<void> {
+  const own = fleetScope(c.caller);
+  if (own === undefined) return;
+  const row = await c.env.DB.prepare(
+    `SELECT 1 AS taken FROM review_routines WHERE routine = ?1 AND nullif(fleet, 'default') IS NOT ?2
+     UNION ALL SELECT 1 FROM tokens WHERE scope = 'orchestrator' AND orchestrator = ?1 AND revoked_at IS NULL AND nullif(fleet, 'default') IS NOT ?2
+     LIMIT 1`,
+  )
+    .bind(id, own)
+    .first();
+  if (row) throw forbidden(`Manager ${id} belongs to another fleet`);
+}
+
 // An orchestrator token may create its own doc; replacing one is manager/human only.
 export function putOrchestratorOp(c: Ctx, id: string, body: Record<string, unknown>): WriteOp<Orchestrator> {
   requireWriter(c.caller, id);
@@ -53,10 +71,12 @@ export function putOrchestratorOp(c: Ctx, id: string, body: Record<string, unkno
     id,
     ifVersion: ifVersion(body.if_version),
     authorize: (cur) => requireFleet(c.caller, cur.data, "Manager"),
-    build: (cur) => {
+    build: async (cur) => {
       const next: Orchestrator = { ...input };
       stampFleet(c.caller, cur?.data ?? null, next, true, "Manager");
       if (cur && scoped) throw forbidden("Orchestrator tokens can create their doc, not replace it");
+      await requireMoveRegistered(c, cur?.data ?? null, next);
+      if (!cur) await requireIdFree(c, id);
       return { ...next, id, updated_at: (input.updated_at as string | undefined) ?? c.now };
     },
     respond: docResponse,
@@ -71,10 +91,11 @@ export function patchOrchestratorOp(c: Ctx, id: string, body: Record<string, unk
     id,
     ifVersion: ifVersion(body.if_version),
     authorize: (cur) => requireFleet(c.caller, cur.data, "Manager"),
-    build: (cur) => {
+    build: async (cur) => {
       if (!cur) throw notFound(`No orchestrator ${id}`);
       const next = mergePatch(cur.data, p);
       stampFleet(c.caller, cur.data, next, false, "Manager");
+      await requireMoveRegistered(c, cur.data, next);
       next.id = id;
       if (!("updated_at" in p)) next.updated_at = c.now;
       return next;

@@ -6,7 +6,7 @@
 
 import { LEASE_SESSION_HEADER, LEASE_SESSION_MAX, type Doc, type Lease, type Schedule } from "../../shared/types.ts";
 import { fleetScope, requireFull, requireFullRole, type Caller } from "../auth.ts";
-import { metaId, targetFleet } from "../fleets.ts";
+import { metaId, registeredTarget, targetFleet } from "../fleets.ts";
 import { badRequest, conflict, ifVersion, json, optString, reqString } from "../http.ts";
 import type { Ctx, Route } from "../router.ts";
 import { getDoc, mutate } from "../store.ts";
@@ -75,12 +75,12 @@ export async function checkLeaseSession(
 }
 
 // The fleet a lease call is for: a token's own, or the one a person names (?fleet= or the body's fleet; the
-// default fleet without one).
-const leaseFleet = (c: Ctx, body?: Record<string, unknown>) => targetFleet(c, body);
+// default fleet without one, and a registered one: 400 otherwise).
+const leaseFleet = (c: Ctx, body?: Record<string, unknown>) => registeredTarget(c, targetFleet(c, body));
 
 async function get(c: Ctx): Promise<Response> {
   requireFull(c.caller);
-  const lease = await getDoc<Lease>(c.env.DB, "meta", metaId("lease", leaseFleet(c)));
+  const lease = await getDoc<Lease>(c.env.DB, "meta", metaId("lease", await leaseFleet(c)));
   const nowMs = Date.parse(c.now);
   return json({ lease, expired: lease ? !isFresh(lease, nowMs) : false, now: c.now });
 }
@@ -88,7 +88,7 @@ async function get(c: Ctx): Promise<Response> {
 async function acquire(c: Ctx): Promise<Response> {
   requireFullRole(c.caller, "admin"); // humans: admins only
   const body = await c.body();
-  const fleet = leaseFleet(c, body); // before the other fields: another fleet's is 403 whatever they say
+  const fleet = await leaseFleet(c, body); // before the other fields: another fleet's is 403 whatever they say
   const sessionId = reqString(body, "session_id", 200);
   const title = optString(body, "title", 500);
   const url = optString(body, "url", 2000);
@@ -121,7 +121,7 @@ async function acquire(c: Ctx): Promise<Response> {
 async function renew(c: Ctx): Promise<Response> {
   requireFullRole(c.caller, "admin"); // humans: admins only
   const body = await c.body();
-  const fleet = leaseFleet(c, body);
+  const fleet = await leaseFleet(c, body);
   const sessionId = reqString(body, "session_id", 200);
   const ttl = await ttlMin(c, body, fleet);
   const pin = ifVersion(body.if_version);
@@ -143,7 +143,7 @@ async function renew(c: Ctx): Promise<Response> {
 async function release(c: Ctx): Promise<Response> {
   requireFullRole(c.caller, "admin"); // humans: admins only
   const body = await c.body();
-  const id = metaId("lease", leaseFleet(c, body));
+  const id = metaId("lease", await leaseFleet(c, body));
   const sessionId = reqString(body, "session_id", 200);
   // One statement: delete only while this session holds it.
   const row = await c.env.DB.prepare(

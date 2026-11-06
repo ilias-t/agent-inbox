@@ -125,4 +125,35 @@ describe("mergeDelta: a delta applied to the /api/state the client holds", () =>
       expect(() => mergeDelta(snapshot(), { ...delta(), ...over } as unknown as StateDelta)).toThrow(DeltaMismatch);
     });
   });
+
+  describe("people's fleets map", () => {
+    const entry = (label: string) => ({ doc: { ...orch("x"), id: label, data: { label } }, manager: null, lease: null, schedule });
+    it("replaces the entries a delta brings and keeps the others", () => {
+      const s = snapshot({ fleets: { default: entry("D"), fa: entry("A") } as StateResponse["fleets"] });
+      const next = mergeDelta(s, delta({ fleets: { fa: entry("A2"), fb: entry("B") } as StateDelta["fleets"] }));
+      expect(Object.keys(next.fleets!).sort()).toEqual(["default", "fa", "fb"]);
+      expect(next.fleets!.fa.doc?.data.label).toBe("A2");
+      expect(next.fleets!.default).toBe(s.fleets!.default);
+      expect(mergeDelta(s, delta()).fleets).toBe(s.fleets);
+    });
+
+    it("merges a part of an entry into the held one", () => {
+      const s = snapshot({ fleets: { fa: entry("A") } as StateResponse["fleets"] });
+      const lease = { ...orch("lease:fa", 3), data: {} } as unknown as NonNullable<StateResponse["fleets"]>[string]["lease"];
+      const next = mergeDelta(s, delta({ fleets: { fa: { lease } } }));
+      expect(next.fleets!.fa.lease).toBe(lease);
+      expect(next.fleets!.fa.doc).toBe(s.fleets!.fa.doc);
+      expect(next.fleets!.fa.schedule).toBe(s.fleets!.fa.schedule);
+    });
+
+    it("refetches when it holds no map, or no entry for a part, to merge into", () => {
+      expect(() => mergeDelta(snapshot(), delta({ fleets: { fa: entry("A") } as StateDelta["fleets"] }))).toThrow(DeltaMismatch);
+      const s = snapshot({ fleets: { default: entry("D") } as StateResponse["fleets"] });
+      expect(() => mergeDelta(s, delta({ fleets: { fb: { lease: null } } }))).toThrow(DeltaMismatch);
+      expect(Object.keys(mergeDelta(s, delta({ fleets: { fb: entry("B") } as StateDelta["fleets"] })).fleets!)).toEqual(["default", "fb"]);
+      for (const bad of [null, 3, [], { fa: null }, { fa: "x" }, { fa: [] }]) {
+        expect(() => mergeDelta(s, { ...delta(), fleets: bad } as unknown as StateDelta)).toThrow(DeltaMismatch);
+      }
+    });
+  });
 });
