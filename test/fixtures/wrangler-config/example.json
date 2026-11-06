@@ -1,0 +1,43 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "agent-inbox",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": [
+    "nodejs_compat",
+    "enable_request_signal"
+  ],
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": [
+      "/api/*",
+      "/agent/*",
+      "/hooks/*"
+    ]
+  },
+  "workers_dev": true,
+  "preview_urls": false,
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "agent-inbox",
+      "database_id": "<your D1 database id>",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "vars": {
+    "ACCESS_TEAM_DOMAIN": "<team>.cloudflareaccess.com",
+    "ACCESS_AUD": "<Access application AUD tag>",
+    "PUBLIC_URL": "https://agent-inbox.<your-subdomain>.workers.dev"
+  },
+  "triggers": {
+    "crons": [
+      "17 4 * * *"
+    ]
+  },
+  "observability": {
+    "enabled": true
+  }
+}

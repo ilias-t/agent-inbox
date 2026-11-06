@@ -13,3 +13,5 @@ test-results/
 wrangler.jsonc
 # Written by scripts/wrangler-config.mjs (the deploy action)
 wrangler.deploy.jsonc
+# Written and removed by test/shared/wrangler-config.test.ts
+wrangler.test-output-*.jsonc

@@ -4,13 +4,22 @@
 // wrangler.test.jsonc fills the instance values with fakes for the tests.
 
 import { readFileSync } from "node:fs";
-import ts from "typescript";
+import { parse, printParseErrorCode } from "jsonc-parser";
 
-// Parses a JSONC file with TypeScript's tsconfig reader, which takes comments
-// and trailing commas the way wrangler does.
+// Parses a JSONC file with jsonc-parser and the options wrangler itself reads
+// its config with (comments and trailing commas allowed, a leading BOM
+// dropped). jsonc-parser recovers from errors and returns what it could read,
+// so any error throws here instead, naming the first one's line and column.
 export function readJsonc(path) {
-  const { config, error } = ts.parseConfigFileTextToJson(path, readFileSync(path, "utf8"));
-  if (error) throw new Error(`${path}: ${ts.flattenDiagnosticMessageText(error.messageText, "\n")}`);
+  const text = readFileSync(path, "utf8").replace(/^\uFEFF/, "");
+  const errors = [];
+  const config = parse(text, errors, { allowTrailingComma: true });
+  if (errors.length) {
+    const { error, offset } = errors[0];
+    const lines = text.slice(0, offset).split("\n");
+    throw new Error(`${path}:${lines.length}:${lines.at(-1).length + 1}: ${printParseErrorCode(error)}`);
+  }
+  if (!config || typeof config !== "object" || Array.isArray(config)) throw new Error(`${path}: the top level must be an object`);
   return config;
 }
 
