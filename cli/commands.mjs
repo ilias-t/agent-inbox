@@ -145,9 +145,9 @@ async function patchOrCreate(api, path, data, pin, base = async () => ({})) {
 }
 
 // `me` → the caller's email from /api/me (humans only); anything else as given.
-async function emailArg(ctx, value, flag) {
+async function emailArg(ctx, value, flag, me) {
   if (value !== "me") return value;
-  const me = await ctx.api("GET", "/api/me");
+  me ??= await ctx.api("GET", "/api/me");
   if (me?.kind !== "human") throw new UsageError(`${flag} me needs a human principal; this is token ${me?.name ?? "?"}`);
   return me.email;
 }
@@ -265,8 +265,10 @@ export const COMMANDS = [
     },
     run: async (ctx) => {
       const v = ctx.values;
-      const assignee = v.assignee === undefined ? undefined : await emailArg(ctx, v.assignee, "--assignee");
-      const fleet = await fleetFilter(ctx);
+      // One /api/me read serves both --assignee me and --fleet.
+      const me = v.assignee === "me" && v.fleet !== undefined ? await ctx.api("GET", "/api/me") : undefined;
+      const assignee = v.assignee === undefined ? undefined : await emailArg(ctx, v.assignee, "--assignee", me);
+      const fleet = await fleetFilter(ctx, me);
       const query = { status: v.status, orchestrator: v.orchestrator, qa_pending: v["qa-pending"] ? "true" : undefined, type: v.type, assignee, fleet };
       ctx.print(await ctx.api("GET", "/api/items", { query }), (r) => itemsList(r.items));
     },
@@ -813,8 +815,9 @@ export const COMMANDS = [
     run: async (ctx) => {
       const v = ctx.values;
       const wait = parseIntFlag(v.wait, "--wait", { min: 0, max: 25 });
+      const since = parseIntFlag(v.since, "--since"); // flags first: a typo costs no request
       const fleet = await fleetFilter(ctx);
-      const query = { since: parseIntFlag(v.since, "--since"), wait, collection: v.collection, fleet };
+      const query = { since, wait, collection: v.collection, fleet };
       const res = await ctx.api("GET", "/api/changes", { query, timeoutMs: ((wait ?? 0) + 15) * 1000 });
       ctx.print(res, (r) => [...r.changes.map(changeLine), `cursor ${r.cursor}`].join("\n"));
     },
@@ -870,7 +873,7 @@ export const COMMANDS = [
 function stateOfFleet(s, fleet) {
   const items = s.items.filter((d) => docFleet(d) === fleet);
   const top = fleet === (fleetOf(s.me) ?? DEFAULT_FLEET) ? { manager: s.manager, lease: s.lease, schedule: s.schedule } : null;
-  const own = s.fleets?.[fleet] ?? top;
+  const own = (s.fleets && Object.hasOwn(s.fleets, fleet) ? s.fleets[fleet] : undefined) ?? top;
   if (!own) throw new Error(noFleet(fleet));
   return {
     ...s,

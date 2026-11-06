@@ -48,7 +48,7 @@ Name manager tokens `orch-<ID>` so `agent-inbox wait --actor token:orch-` can pi
 
 | Command | Does |
 |---|---|
-| `me [--expect-fleet <id>]`, `state [--fleet <id>]` | Who the token is (a human's role, a token's fleet); everything the UI loads. `--expect-fleet` exits 3 (and says why on stderr) unless the token belongs to that fleet (`default` for the default fleet): an orchestrator's startup check that it was given the right token. A person is in no fleet, so it exits 3 for them too. `state --fleet` keeps one fleet's items and managers, with its own status, lease and hours |
+| `me [--expect-fleet <id>]`, `state [--fleet <id>]` | Who the token is (a human's role, a token's fleet); everything the UI loads. `--expect-fleet` exits 3 (and says why on stderr) unless the token belongs to that fleet (`default` for the default fleet): an orchestrator's startup check that it was given the right token. A person is in no fleet, so it exits 3 for them too. `state --fleet` keeps one fleet's items and managers, with its own status, lease and hours (`routines`, `fleets`, `cursor` and `archived_more` stay deployment-wide) |
 | `fleets` | Each fleet you can see, with its orchestrator's status: lease holder and heartbeat, last and next tick, work hours (and whether they're inherited). People see every fleet; a token, its own |
 | `users` | People and their roles (`email  role  name`). Read-only: roles are set by an admin in Settings → People, and no token can change them |
 | `items [--status open,decided] [--orchestrator O3] [--qa-pending] [--type T] [--assignee email\|none\|me] [--fleet <id>]` | List items (`me` = your email from `/api/me`; humans only) |

@@ -1078,6 +1078,7 @@ describe("fleets", () => {
     seen = [];
     expect((await run(["state", "--fleet", "nope"])).code).toBe(1);
     expect(seen.map((x) => x.path)).toEqual(["/agent/api/state"]); // checked in what /api/state sent, no extra call
+    expect((await run(["state", "--fleet", "constructor"])).code).toBe(1); // not a key the map inherits
   });
 
   it("state --fleet <own> works for a named fleet's token, from the top-level status it gets", async () => {

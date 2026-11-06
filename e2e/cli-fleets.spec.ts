@@ -56,6 +56,7 @@ test("a person lists every fleet and filters by one", async ({ request }) => {
   const fleet = `cli-p-${Date.now().toString(36)}`;
   expect((await request.put(`/api/fleets/${fleet}`, { data: { data: { label: "Person view" } } })).status()).toBe(201);
   const minted = await request.post("/api/tokens", { data: { name: `orch-${fleet}`, scope: "manager", fleet } });
+  expect(minted.status(), await minted.text()).toBe(201);
   const token = (await minted.json()).secret as string;
   expect((await cli(token, ["post", `${fleet}-ask`, "--type", "info", "--title", "From the fleet"])).code).toBe(0);
 
