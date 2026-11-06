@@ -35,7 +35,7 @@ export function changeMatcher({ human = false, actors, statuses, ids, ops } = {}
 // → {cursor, changes, timed_out}. `changes` holds the matching changes of the
 // batch that matched; `cursor` is that batch's cursor (pass it back as since).
 export async function waitForChanges(api, opts, io) {
-  const { since, collection, match = () => true, timeoutMs = 0, pollWaitS = MAX_SERVER_WAIT_S } = opts;
+  const { since, collection, fleet, match = () => true, timeoutMs = 0, pollWaitS = MAX_SERVER_WAIT_S } = opts;
   const { sleep, now, log = () => {} } = io;
   const deadline = timeoutMs > 0 ? now() + timeoutMs : Infinity;
   let cursor = since;
@@ -60,7 +60,7 @@ export async function waitForChanges(api, opts, io) {
   }
 
   if (cursor === undefined) {
-    const res = await poll({ collection }, 0);
+    const res = await poll({ collection, fleet }, 0);
     if (!res) return { cursor: null, changes: [], timed_out: true };
     cursor = res.cursor;
   }
@@ -70,7 +70,7 @@ export async function waitForChanges(api, opts, io) {
     if (remainingS <= 0 && deadline !== Infinity) return { cursor, changes: [], timed_out: true };
     const waitS = Math.max(0, Math.min(pollWaitS, remainingS));
     const started = now();
-    const res = await poll({ since: cursor, wait: waitS, collection }, waitS);
+    const res = await poll({ since: cursor, wait: waitS, collection, fleet }, waitS);
     if (!res) return { cursor, changes: [], timed_out: true };
     const changes = Array.isArray(res.changes) ? res.changes : [];
     cursor = Math.max(cursor, Number.isInteger(res.cursor) ? res.cursor : cursor, ...changes.map((c) => c.seq));

@@ -103,12 +103,21 @@ export function leaseText(res, nowMs) {
     .join("\n");
 }
 
+// Where a schedule view's hours come from: a fleet's own doc, the deployment's (which a fleet without its own
+// inherits), or the built-in defaults when nothing was ever written.
+function scheduleSource(view) {
+  if (view.inherited) {
+    return `[inherited: the deployment's hours${view.inherited_version == null ? ", not written yet (defaults)" : ` v${view.inherited_version}`}; set this fleet's own with schedule set]`;
+  }
+  return view.version === null ? "[defaults; meta/schedule not written]" : `v${view.version}`;
+}
+
 export function scheduleText(view) {
   const { schedule: s, computed: c } = view;
   const off = c.utc_offset_min;
   const offset = `UTC${off >= 0 ? "+" : "-"}${Math.floor(Math.abs(off) / 60)}${Math.abs(off) % 60 ? `:${String(Math.abs(off) % 60).padStart(2, "0")}` : ""}`;
   return [
-    `Schedule:  ${c.label}  (${s.timezone}, ${offset} now)${view.version === null ? "  [defaults; meta/schedule not written]" : `  v${view.version}`}`,
+    `Schedule:  ${c.label}  (${s.timezone}, ${offset} now)  ${scheduleSource(view)}`,
     `Now:       ${c.in_hours ? "in work hours" : "off hours"}  (${c.now})`,
     `Intervals: pickup every ${s.pickup_interval_min} min · full sweep every ${s.sweep_interval_min} min`,
     `Next:      pickup ${c.next_pickup_at ?? "-"} · window start ${c.next_window_start ?? "-"}`,
@@ -125,6 +134,30 @@ export function changeLine(c) {
   return `change ${c.seq}  ${c.op}  ${target}${c.version ? ` v${c.version}` : ""}${c.status ? `  ${c.status}` : ""}  by ${c.actor || "?"}  at ${c.at}`;
 }
 
+// `fleets`: one block per fleet, its orchestrator's lease, status and hours.
+export function fleetsText(fleets, nowMs) {
+  const ids = Object.keys(fleets ?? {}).sort((a, b) => (a === "default" ? -1 : b === "default" ? 1 : a.localeCompare(b)));
+  if (!ids.length) return "no fleets";
+  return ids
+    .map((id) => {
+      const f = fleets[id];
+      const d = f.doc?.data ?? {};
+      const head = [id, d.label ? `"${d.label}"` : "", d.id_prefix ? `ids ${d.id_prefix}1, ${d.id_prefix}2…` : ""].filter(Boolean).join("  ");
+      const l = f.lease?.data;
+      const lease = !l
+        ? "lease free"
+        : `lease ${Date.parse(l.expires_at) < nowMs ? "EXPIRED" : "held"} by ${l.holder_title ?? l.holder_session_id} (heartbeat ${ago(l.heartbeat_at, nowMs)})`;
+      const m = f.manager?.data ?? {};
+      const c = f.schedule?.computed;
+      const hours = c ? `${c.in_hours ? "in hours" : "off hours"} (${c.label}${f.schedule.inherited ? ", inherited" : ""})` : "";
+      const ticks = `last tick ${m.last_tick ? ago(m.last_tick, nowMs) : "-"} · next ${m.next_tick ? ago(m.next_tick, nowMs) : "-"}`;
+      return [head, `  ${lease}`, `  ${ticks}${hours ? ` · ${hours}` : ""}`, m.tick_requested_at ? `  tick requested ${ago(m.tick_requested_at, nowMs)}` : ""]
+        .filter(Boolean)
+        .join("\n");
+    })
+    .join("\n");
+}
+
 export function stateText(s, nowMs) {
   const byStatus = {};
   for (const i of s.items) byStatus[i.data?.status] = (byStatus[i.data?.status] ?? 0) + 1;
@@ -132,6 +165,7 @@ export function stateText(s, nowMs) {
   const open = s.items.filter((i) => i.data?.status === "open");
   const lines = [
     `me: ${principalText(s.me)}`,
+    ...(s.fleet ? [`fleet: ${s.fleet}`] : []),
     `items: ${counts}`,
     `orchestrators: ${s.orchestrators.map((o) => `${o.id} ${o.data?.status ?? "?"}`).join(", ") || "none"}`,
     leaseText({ lease: s.lease, expired: s.lease ? Date.parse(s.lease.data.expires_at) < nowMs : false }, nowMs),

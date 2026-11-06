@@ -971,3 +971,132 @@ describe("orch relink", () => {
     rmSync(join(home, ".claude-other"), { recursive: true, force: true });
   });
 });
+
+describe("fleets", () => {
+  const sched = (over: Record<string, unknown> = {}) => ({
+    schedule: { work_hours: "10:00-18:00 Mon-Fri", timezone: "UTC", pickup_interval_min: 10, sweep_interval_min: 30 },
+    version: 2,
+    computed: { now: "x", in_hours: true, next_pickup_at: null, next_window_start: null, label: "10:00–18:00 UTC, Mon–Fri", utc_offset_min: 0, cron_utc: ["*/10 10-17 * * 1-5"], cron_exact: true },
+    ...over,
+  });
+  const token = (fleet?: string) => ({ kind: "token", name: "orch", scope: "manager", ...(fleet ? { fleet } : {}) });
+
+  it("me --expect-fleet exits 0 on the token's fleet and 3 on another, a person or a malformed id", async () => {
+    handler = () => ({ body: token("side-a") });
+    expect((await run(["me", "--expect-fleet", "side-a"])).code).toBe(0);
+    const wrong = await run(["me", "--expect-fleet", "side-b"]);
+    expect(wrong.code).toBe(3);
+    expect(wrong.stderr).toContain("belongs to fleet side-a, not side-b");
+    handler = () => ({ body: token() }); // a server before fleets: the default fleet
+    expect((await run(["me", "--expect-fleet", "default"])).code).toBe(0);
+    expect((await run(["me", "--expect-fleet", "side-a"])).code).toBe(3);
+    handler = () => ({ body: { kind: "human", email: "a@b.c", role: "admin", is_admin: true } });
+    expect((await run(["me", "--expect-fleet", "default"])).code).toBe(3);
+    expect((await run(["me", "--expect-fleet", "Side A"])).code).toBe(2);
+  });
+
+  it("fleets lists every fleet for a person, from /api/state", async () => {
+    const lease = doc("lease:side-a", { holder_session_id: "s1", holder_title: "orch A", heartbeat_at: "2026-10-07T14:58:00.000Z", expires_at: "2026-10-07T15:20:00.000Z", acquired_at: "x" });
+    handler = (req) => ({
+      body: {
+        me: { kind: "human", email: "a@b.c", role: "admin", is_admin: true },
+        fleets: {
+          default: { doc: null, manager: doc("manager", { next_tick: "2026-10-07T15:10:00.000Z" }), lease: null, schedule: sched() },
+          "side-a": { doc: doc("side-a", { label: "Side A", id_prefix: "S" }), manager: null, lease, schedule: sched({ inherited: true, version: null }) },
+        },
+      },
+      ...(req.path.startsWith("/agent/api/state") ? {} : { status: 500 }),
+    });
+    const r = await run(["fleets"]);
+    expect(r.code).toBe(0);
+    expect(seen[0].path).toBe("/agent/api/state?archived=0");
+    expect(r.stdout).toContain("default\n  lease free\n  last tick - · next in 10m · in hours");
+    expect(r.stdout).toContain('side-a  "Side A"  ids S1, S2…\n  lease held by orch A (heartbeat 2m ago)');
+    expect(r.stdout).toContain("inherited)");
+    expect(JSON.parse((await run(["fleets", "--json"])).stdout).fleets).toHaveProperty("side-a");
+  });
+
+  it("fleets shows a token its own fleet, labelled from the registry when it may read it", async () => {
+    handler = (req) =>
+      req.path.startsWith("/agent/api/fleets")
+        ? { body: { fleets: [doc("side-a", { label: "Side A" })] } }
+        : { body: { me: token("side-a"), manager: null, lease: null, schedule: sched() } };
+    const r = await run(["fleets"]);
+    expect(r.code).toBe(0);
+    expect(r.stdout).toMatch(/^side-a {2}"Side A"/);
+    // A manager token can't read the registry: no label.
+    handler = (req) =>
+      req.path.startsWith("/agent/api/fleets") ? { status: 403, body: { error: "forbidden", message: "no" } } : { body: { me: token(), manager: null, lease: null, schedule: sched() } };
+    expect((await run(["fleets"])).stdout).toMatch(/^default\n/);
+  });
+
+  it("--fleet filters items, changes and wait for a person, and a token naming another fleet is refused", async () => {
+    handler = (req) => (req.path === "/agent/api/me" ? { body: { kind: "human", email: "a@b.c", role: "admin", is_admin: true } } : { body: { items: [], changes: [], cursor: 5 } });
+    expect((await run(["items", "--fleet", "side-a"])).code).toBe(0);
+    expect(seen.at(-1)!.path).toBe("/agent/api/items?fleet=side-a");
+    expect((await run(["changes", "--since", "1", "--fleet", "side-a"])).code).toBe(0);
+    expect(seen.at(-1)!.path).toBe("/agent/api/changes?since=1&fleet=side-a");
+    seen = [];
+    handler = (req) =>
+      req.path === "/agent/api/me"
+        ? { body: { kind: "human", email: "a@b.c", role: "admin", is_admin: true } }
+        : { body: { changes: [{ seq: 6, collection: "items", doc_id: "i", op: "update", actor: "human:a@b.c", at: "x" }], cursor: 6 } };
+    expect((await run(["wait", "--since", "5", "--fleet", "side-a", "--timeout", "30"])).code).toBe(0);
+    expect(seen.at(-1)!.path).toContain("fleet=side-a");
+    handler = (req) => (req.path === "/agent/api/me" ? { body: token("side-a") } : { body: { items: [] } });
+    const refused = await run(["items", "--fleet", "side-b"]);
+    expect(refused.code).toBe(1);
+    expect(refused.stderr).toContain("belongs to fleet side-a");
+    expect((await run(["items", "--fleet", "side-a"])).code).toBe(0); // its own: a no-op
+    expect((await run(["items", "--fleet", "Bad"])).code).toBe(2);
+  });
+
+  it("state --fleet keeps one fleet's items, managers, status, lease and hours", async () => {
+    const human = { kind: "human", email: "a@b.c", role: "admin", is_admin: true };
+    handler = () => ({
+      body: {
+        me: human,
+        items: [doc("d1", { status: "open", type: "info", title: "D" }), doc("a1", { status: "open", type: "info", title: "A", fleet: "side-a" }), doc("a2", { status: "archived", type: "info", title: "A2", fleet: "side-a" })],
+        orchestrators: [doc("O1", { status: "running" }), doc("S1", { status: "running", fleet: "side-a" })],
+        manager: doc("manager", { last_tick: "d" }),
+        lease: null,
+        schedule: sched(),
+        cursor: 9,
+        archived_total: 1,
+        fleets: { "side-a": { doc: null, manager: doc("manager:side-a", { last_tick: "a" }), lease: null, schedule: sched({ inherited: true, version: null }) } },
+      },
+    });
+    const r = JSON.parse((await run(["state", "--fleet", "side-a", "--json"])).stdout);
+    expect(r.items.map((d: { id: string }) => d.id)).toEqual(["a1", "a2"]);
+    expect(r.orchestrators.map((d: { id: string }) => d.id)).toEqual(["S1"]);
+    expect(r.manager.id).toBe("manager:side-a");
+    expect(r.schedule.inherited).toBe(true);
+    expect(r.archived_total).toBe(1);
+    const d = JSON.parse((await run(["state", "--fleet", "default", "--json"])).stdout);
+    expect(d.items.map((x: { id: string }) => x.id)).toEqual(["d1"]);
+    expect((await run(["state", "--fleet", "side-a"])).stdout).toContain("fleet: side-a");
+    expect((await run(["state", "--fleet", "nope"])).code).toBe(1);
+  });
+
+  it("labels a fleet's inherited hours, and meta set schedule starts a fleet's own from them", async () => {
+    handler = () => ({ body: sched({ inherited: true, version: null, inherited_version: 4 }) });
+    expect((await run(["schedule"])).stdout).toContain("[inherited: the deployment's hours v4;");
+    handler = () => ({ body: sched({ version: null }) });
+    expect((await run(["schedule"])).stdout).toContain("[defaults; meta/schedule not written]");
+    // PATCH meets no doc of its own: it reads the hours the fleet has and creates its own with the change.
+    handler = (req) =>
+      req.method === "PATCH"
+        ? { status: 404, body: { error: "not_found", message: "No meta/schedule:side-a" } }
+        : req.method === "GET"
+          ? { body: sched({ inherited: true, version: null }) }
+          : { status: 201, body: doc("schedule:side-a", req.body as Record<string, unknown>) };
+    const r = await run(["meta", "set", "schedule", "--set", "pickup_interval_min:=5"]);
+    expect(r.code).toBe(0);
+    const put = seen.find((x) => x.method === "PUT")!;
+    expect(put.path).toBe("/agent/api/meta/schedule");
+    expect(put.body).toEqual({ data: { work_hours: "10:00-18:00 Mon-Fri", timezone: "UTC", pickup_interval_min: 5, sweep_interval_min: 30 }, if_version: 0 });
+    seen = [];
+    await run(["meta", "set", "schedule:side-a", "--set", "pickup_interval_min:=5"]);
+    expect(seen.find((x) => x.method === "GET")!.path).toBe("/agent/api/schedule?fleet=side-a");
+  });
+});
