@@ -125,4 +125,20 @@ describe("mergeDelta: a delta applied to the /api/state the client holds", () =>
       expect(() => mergeDelta(snapshot(), { ...delta(), ...over } as unknown as StateDelta)).toThrow(DeltaMismatch);
     });
   });
+
+  describe("people's fleets map", () => {
+    const entry = (label: string) => ({ doc: { ...orch("x"), id: label, data: { label } }, manager: null, lease: null, schedule });
+    it("replaces the entries a delta brings and keeps the others", () => {
+      const s = snapshot({ fleets: { default: entry("D"), fa: entry("A") } as StateResponse["fleets"] });
+      const next = mergeDelta(s, delta({ fleets: { fa: entry("A2"), fb: entry("B") } as StateDelta["fleets"] }));
+      expect(Object.keys(next.fleets!).sort()).toEqual(["default", "fa", "fb"]);
+      expect(next.fleets!.fa.doc?.data.label).toBe("A2");
+      expect(next.fleets!.default).toBe(s.fleets!.default);
+      expect(mergeDelta(s, delta()).fleets).toBe(s.fleets);
+    });
+
+    it("refetches when the snapshot it holds has no map to merge into", () => {
+      expect(() => mergeDelta(snapshot(), delta({ fleets: { fa: entry("A") } as StateDelta["fleets"] }))).toThrow(DeltaMismatch);
+    });
+  });
 });

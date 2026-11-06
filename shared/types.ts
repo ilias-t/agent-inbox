@@ -130,6 +130,26 @@ export interface Lease {
   expires_at: string;
 }
 
+// A fleet's registry doc, `fleets/<id>` (docs/api.md "Fleets"): how the app shows it. Every field is optional.
+export interface Fleet {
+  label?: string; // up to 64 characters
+  color?: string; // "#rrggbb"
+  id_prefix?: string; // what its manager ids start with, e.g. "S" for S1, S2 (a convention; the server doesn't enforce it)
+}
+export const FLEET_KEYS = ["label", "color", "id_prefix"] as const;
+export const FLEET_LABEL_MAX = 64;
+export const FLEET_COLOR_RE = /^#[0-9a-f]{6}$/i;
+export const FLEET_PREFIX_RE = /^[A-Za-z][A-Za-z0-9]{0,7}$/;
+
+// One fleet's entry in /api/state `fleets` (people only): its registry doc (null while unlabelled: always
+// possible for `default`), and its own status, lease and schedule view, as its orchestrator token sees them.
+export interface FleetState {
+  doc: Doc<Fleet> | null;
+  manager: Doc<ManagerMeta> | null;
+  lease: Doc<Lease> | null;
+  schedule: ScheduleView;
+}
+
 // Opt-in lease check on writes (docs/api.md "Lease-checked writes"): a
 // manager-token write carrying this header with the caller's session id lands
 // only while that session holds a fresh meta/lease; otherwise 409 lease_held
@@ -241,6 +261,9 @@ export interface StateResponse {
   // Every routine that has reported, as the Reviews tab's nav gate (docs/reviews.md). Orchestrator tokens get
   // only their own. Optional: a Worker from before migration 0009, and snapshots saved by one, don't have it.
   routines?: RoutineState[];
+  // People only (docs/api.md "Fleets"): every fleet by id, `default` always, plus each registered one. Optional:
+  // tokens don't get it, nor does a Worker from before fleets were registered (or a snapshot saved by one).
+  fleets?: Record<string, FleetState>;
 }
 
 // GET /api/state/delta?since=<cursor>: what changed in the caller's /api/state since a cursor (docs/api.md,
@@ -261,6 +284,7 @@ export interface StateDelta {
   archived_total?: number; // when an item may have entered or left the archive
   reviews_changed?: string[]; // routine ids whose review data changed: refetch GET /api/reviews/:routine if shown
   routines?: RoutineState[]; // the whole list, as in /api/state, when reviews_changed is present
+  fleets?: Record<string, FleetState>; // people only: the whole map, as in /api/state, when any part of it changed
 }
 
 // Too far behind (changes pruned, or more than the cap): fetch /api/state instead.
@@ -328,6 +352,9 @@ export interface TokenInfo {
   name: string;
   scope: "manager" | "orchestrator";
   orchestrator: string | null;
+  // Its fleet, "default" for the default fleet (docs/api.md "Fleets"). Optional: a Worker from before fleet-bound
+  // tokens doesn't send it; read absent as "default".
+  fleet?: string;
   created_at: string;
   created_by: string;
   last_used_at: string | null;

@@ -1,5 +1,5 @@
 import type {
-  ChangesResponse, Change, Doc, Item, ManagerMeta, PersonSettings, QaMessage, ReviewPrResponse, ReviewRun, ReviewRunRequestResponse, Role, RoutineReviewsResponse, Schedule, ScheduleView,
+  ChangesResponse, Change, Doc, Fleet, Item, ManagerMeta, PersonSettings, QaMessage, ReviewPrResponse, ReviewRun, ReviewRunRequestResponse, Role, RoutineReviewsResponse, Schedule, ScheduleView,
   SnoozeResponse, StateDeltaResponse, StateResponse, TokenInfo, UserInfo, UsersResponse, PinKind, PinResponse,
 } from "../shared/types.ts";
 import { DeltaMismatch, deletedItems, mergeDelta, type Synced } from "./lib/delta.ts";
@@ -135,8 +135,16 @@ export const store = {
   putSchedule: (schedule: Schedule, ifVersion: number | null) =>
     call<ScheduleView>("PUT", "/api/schedule", ifVersion == null ? { schedule } : { schedule, if_version: ifVersion }),
   listTokens: async () => (await call<{ tokens: TokenInfo[] }>("GET", "/api/tokens")).tokens,
-  createToken: (name: string, scope: "manager" | "orchestrator", orchestrator: string | null) =>
-    call<{ token: TokenInfo; secret: string }>("POST", "/api/tokens", orchestrator ? { name, scope, orchestrator } : { name, scope }),
+  // fleet: "default" or a registered fleet; null leaves it out (a manager token then takes its manager id's fleet).
+  createToken: (name: string, scope: "manager" | "orchestrator", orchestrator: string | null, fleet: string | null = null) =>
+    call<{ token: TokenInfo; secret: string }>("POST", "/api/tokens", {
+      name, scope, ...(orchestrator ? { orchestrator } : {}), ...(fleet ? { fleet } : {}),
+    }),
+  // The fleet registry (Settings → Fleets; docs/api.md "Fleets registry"). Admins write; ifVersion 0 creates only.
+  listFleets: async () => (await call<{ fleets: Doc<Fleet>[] }>("GET", "/api/fleets")).fleets,
+  putFleet: (id: string, data: Fleet, ifVersion: number) => call<Doc<Fleet>>("PUT", "/api/fleets/" + enc(id), { data, if_version: ifVersion }),
+  patchFleet: (id: string, data: Record<string, string | null>, ifVersion: number) =>
+    call<Doc<Fleet>>("PATCH", "/api/fleets/" + enc(id), { data, if_version: ifVersion }),
   revokeToken: (id: string) => call<{ ok: true }>("DELETE", "/api/tokens/" + enc(id)),
   // Web Push for this device (Settings → Notifications): the server's VAPID key, and the caller's own subscriptions.
   getPushKey: async () => (await call<{ key: string }>("GET", "/api/push/key")).key,

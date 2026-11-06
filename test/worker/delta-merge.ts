@@ -12,8 +12,10 @@ const byId = (a: { id: string }, b: { id: string }) => (a.id < b.id ? -1 : a.id 
 
 // What must match between a merged snapshot and a fresh one: everything but the schedule's `computed` (it is
 // computed at read time; the client recomputes it) and `archived_more` (a delta never carries it).
+const withoutComputed = ({ computed: _computed, ...rest }: StateResponse["schedule"]) => rest;
+
 export function normalize(s: StateResponse) {
-  const { computed: _computed, ...schedule } = s.schedule;
+  const schedule = withoutComputed(s.schedule);
   return {
     items: [...s.items].sort(byId),
     orchestrators: [...s.orchestrators].sort(byId),
@@ -27,6 +29,7 @@ export function normalize(s: StateResponse) {
     pins: s.pins,
     archived_total: s.archived_total,
     routines: s.routines,
+    fleets: s.fleets && Object.fromEntries(Object.entries(s.fleets).map(([id, f]) => [id, { ...f, schedule: withoutComputed(f.schedule) }])),
   };
 }
 

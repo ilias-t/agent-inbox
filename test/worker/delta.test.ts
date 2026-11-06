@@ -387,6 +387,7 @@ describe("GET /api/state/delta", () => {
         covered.add(`${v.name} removed`);
       if (d.body.routines) covered.add(`${v.name} routines`);
       if (d.body.pins) covered.add(`${v.name} pins`);
+      if (d.body.fleets) covered.add(`${v.name} fleets`);
       const merged = applyDelta(before, d.body);
       const fresh = (await v.get("/api/state")).body as StateResponse;
       expect(normalize(merged), `${v.name} after step ${step}`).toEqual(normalize(fresh));
@@ -486,6 +487,11 @@ describe("GET /api/state/delta", () => {
         faHours()
           ? fa.put("/api/schedule", { schedule: { ...schedule, pickup_interval_min: R.pick([5, 10, 15]) } })
           : fa.del("/api/schedule"),
+      // The fleet registry (people's `fleets` map): an admin labels fleet fa and the default fleet, and registers new
+      // fleets, which then appear with the hours they inherit.
+      async () => human.patch("/api/fleets/fa", { data: { label: uid("fa"), color: R.pick(["#112233", "#445566", null]) } }),
+      async () => human.put("/api/fleets/default", { data: { label: uid("default") } }),
+      async () => human.put(`/api/fleets/${uid("fz").toLowerCase()}`, { data: {} }),
     ];
 
     // Each kind ROUNDS times (creates twice that, as deletes use them up), in a seeded shuffle; the first step
@@ -513,7 +519,8 @@ describe("GET /api/state/delta", () => {
     for (const v of viewers) await pull(v, deck.length);
     expect(ops.map((_, k) => k).filter((k) => !landed.has(k)), "kinds that never landed").toEqual([]);
     const merges = viewers.flatMap((v) => [`${v.name} updated`, `${v.name} removed`, `${v.name} routines`])
-      .concat(["admin pins", "A pins", "B pins"]); // tokens never get pins
+      .concat(["admin pins", "A pins", "B pins"]) // tokens never get pins
+      .concat(["admin fleets", "A fleets", "B fleets"]); // nor the fleets map
     expect(merges.filter((m) => !covered.has(m)), "merges no caller made").toEqual([]);
   });
 });

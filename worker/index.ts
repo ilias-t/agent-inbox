@@ -10,6 +10,7 @@ import { errorResponse, json, notFound } from "./http.ts";
 import { pruneOnSchedule, prunePins, prunePushSubscriptions, pruneReviews, pruneSnoozes } from "./prune.ts";
 import { makeCtx, Router } from "./router.ts";
 import { batchRoutes } from "./routes/batch.ts";
+import { fleetRoutes } from "./routes/fleets.ts";
 import { changeRoutes } from "./routes/changes.ts";
 import { deltaRoutes } from "./routes/delta.ts";
 import { itemRoutes } from "./routes/items.ts";
@@ -31,6 +32,7 @@ const api = new Router([
   ...itemRoutes,
   ...orchestratorRoutes,
   ...metaRoutes,
+  ...fleetRoutes,
   ...leaseRoutes,
   ...peopleRoutes,
   ...pushRoutes,

@@ -62,6 +62,12 @@ export function mergeDelta(s: StateResponse, d: StateDeltaResponse): StateRespon
   if (d.pins) next.pins = d.pins;
   if (typeof d.archived_total === "number") next.archived_total = d.archived_total;
   if (Array.isArray(d.routines)) next.routines = d.routines;
+  // Entry by entry: fleets are never deleted, so the ones a delta leaves out are unchanged. A snapshot without the
+  // map (from a Worker before it) can't take part of one: refetch.
+  if (d.fleets && typeof d.fleets === "object") {
+    if (!s.fleets) throw new DeltaMismatch("fleets without a map to merge into");
+    next.fleets = { ...s.fleets, ...d.fleets };
+  }
   return next;
 }
 

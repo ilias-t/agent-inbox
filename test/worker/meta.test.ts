@@ -88,7 +88,7 @@ describe("state", () => {
     const s = await human.get("/api/state");
     expect(s.status).toBe(200);
     expect(Object.keys(s.body).sort()).toEqual(
-      ["items", "orchestrators", "manager", "lease", "schedule", "cursor", "me", "people", "snoozes", "pins", "archived_total", "archived_more", "routines"].sort(),
+      ["items", "orchestrators", "manager", "lease", "schedule", "cursor", "me", "people", "snoozes", "pins", "archived_total", "archived_more", "routines", "fleets"].sort(),
     );
     expect(s.body.snoozes).toEqual({});
     expect(s.body.pins).toEqual({});

@@ -2,7 +2,7 @@
 
 import type { Change } from "../../shared/types.ts";
 import { orchestratorScope } from "../auth.ts";
-import { fleetChangesSql, fleetFilter, SHARED_CHANGES } from "../fleets.ts";
+import { fleetChangesSql, fleetFilter, registeredTarget, SHARED_CHANGES } from "../fleets.ts";
 import { badRequest, json } from "../http.ts";
 import type { Ctx, Route } from "../router.ts";
 import { latestSeq } from "../store.ts";
@@ -52,6 +52,8 @@ async function changes(c: Ctx): Promise<Response> {
   const q = c.url.searchParams;
   const db = c.env.DB;
   const since = intParam(q.get("since"), "since");
+  // A person's ?fleet= names a registered fleet, the bootstrap call (no since) included.
+  const fleet = await registeredTarget(c, fleetFilter(c.caller, q));
   if (since === undefined) return json({ cursor: await latestSeq(db), changes: [] });
   const wait = Math.min(intParam(q.get("wait"), "wait") ?? 0, WAIT_MAX_S);
   const collection = q.get("collection");
@@ -59,7 +61,6 @@ async function changes(c: Ctx): Promise<Response> {
     throw badRequest(`collection must be one of ${Object.keys(COLLECTION_FILTERS).join(", ")}`);
   }
   const scope = orchestratorScope(c.caller);
-  const fleet = fleetFilter(c.caller, q);
   const fleetSql = fleet === undefined ? "" : scope !== null ? MANAGER_FLEET_FILTER : FLEET_FILTER(fleet !== null);
   const cols = "seq, collection, doc_id, op, version, status, actor, at";
   const tail = `${collection ? COLLECTION_FILTERS[collection] : ""} ${SNOOZE_FILTER} ORDER BY seq LIMIT ${PAGE}`;

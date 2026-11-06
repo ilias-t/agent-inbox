@@ -13,7 +13,7 @@ import { docResponse, opRoute, type OpBuilder, type WriteOp } from "../ops.ts";
 import type { Ctx, Route } from "../router.ts";
 import { getDoc, mergePatch, mutate } from "../store.ts";
 import { checkSchedule } from "./schedule.ts";
-import { metaFleet, metaId, requireMetaFleet, resolveMetaId, targetFleet } from "../fleets.ts";
+import { metaFleet, metaId, registeredTarget, requireMetaFleet, requireMetaRegistered, resolveMetaId, targetFleet } from "../fleets.ts";
 
 const PEOPLE_ONLY = "meta/people was replaced by the users table: use /api/people/me and /api/users";
 
@@ -52,8 +52,9 @@ function metaOp(mode: "put" | "patch"): OpBuilder {
       collection: "meta",
       id,
       ifVersion: ifVersion(body.if_version),
-      build: (cur) => {
+      build: async (cur) => {
         if (mode === "patch" && !cur) throw notFound(`No meta/${id}`);
+        await requireMetaRegistered(c, id); // a person's `meta/manager:<fleet>` names a registered fleet
         const next = mode === "patch" ? mergePatch(cur!.data, input) : input;
         return id === "schedule" || perFleet?.base === "schedule" ? { ...checkSchedule(next) } : next;
       },
@@ -70,7 +71,7 @@ export const patchMetaOp = metaOp("patch");
 async function tickRequest(c: Ctx): Promise<Response> {
   requireFullRole(c.caller, "decider");
   const body = await c.body();
-  const fleet = targetFleet(c, body); // before the note: another fleet's is 403 whatever it says
+  const fleet = await registeredTarget(c, targetFleet(c, body)); // before the note: another fleet's is 403 whatever it says
   const note = optString(body, "note", 2000);
   const { doc } = await mutate<ManagerMeta>(
     c.env.DB,
