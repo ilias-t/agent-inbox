@@ -90,12 +90,14 @@ export async function deleteInFleet(
 // The change rows (`changes`, migration 0012) a fleet's orchestrator token sees. The default fleet's are the
 // rows with no fleet at all, so with one fleet that is every row, as before fleets (and one range of the
 // changes_fleet index). A named fleet's (`p` binds it) are its own, and the deployment-wide rows, which log no
-// fleet: people, shared meta docs, and a person's own snoozes and pins (which only that person ever gets).
+// fleet: people, shared meta docs (the schedule a fleet falls back on among them; not the default fleet's
+// manager and lease), and a person's own snoozes and pins (which only that person ever gets).
 export const fleetChangesSql = (named: boolean, p: string) => (named ? `(fleet = ${p} OR (${SHARED_CHANGES}))` : "fleet IS NULL");
 
-// The deployment-wide change rows, word for word the condition of migration 0012's partial index changes_shared,
-// so a query that names it can read just those rows.
-export const SHARED_CHANGES = "fleet IS NULL AND collection IN ('users', 'meta', 'snoozes', 'pins')";
+// The deployment-wide change rows: the condition of migration 0012's partial index changes_shared, word for word
+// (so a query that names it can read just those rows), less the default fleet's own manager and lease.
+export const SHARED_CHANGES =
+  "fleet IS NULL AND collection IN ('users', 'meta', 'snoozes', 'pins') AND NOT (collection = 'meta' AND doc_id IN ('manager', 'lease'))";
 
 // A per-fleet meta doc's id is `<base>:<fleet>` (`manager:side-a`), and migration 0012 logs its changes under that
 // fleet. The fleet it names: null for `<base>:default`, undefined for any other id (a doc every fleet shares).
@@ -111,4 +113,28 @@ export function requireMetaFleet(c: Caller, id: string): void {
   const own = fleetScope(c), named = metaFleet(id);
   if (named && named.fleet === null) throw badRequest(`The default fleet's is meta/${named.base}`);
   if (own !== undefined && named && named.fleet !== own) throw forbidden(`meta/${id} belongs to another fleet`);
+}
+
+// --- Per-fleet lease, status and work hours (docs/api.md "Fleets") ----------------------------------------------
+
+export type MetaBase = "manager" | "lease" | "schedule";
+
+// A fleet's own copy of a per-fleet meta doc: the bare id (`meta/lease`) for the default fleet, as before fleets.
+export const metaId = (base: MetaBase, fleet: string | null) => (fleet === null ? base : `${base}:${fleet}`);
+
+// The fleet a lease, schedule or tick-request call acts on: a token's own (one that names another fleet is 403),
+// or the one a person names (`asked`: a `?fleet=` or body value, `default` or a fleet id), else the default fleet.
+export function targetFleet(c: Caller, asked: unknown): string | null {
+  const named = asked === undefined || asked === null ? undefined : parseFleet(asked);
+  const own = fleetScope(c);
+  if (own === undefined) return named ?? null;
+  if (named !== undefined && named !== own) throw forbidden("That is another fleet's");
+  return own;
+}
+
+// The id a meta route reads or writes for `id`: a named fleet's token names its own fleet's manager, lease and
+// schedule by their bare ids, so its calls stay what they were before fleets. Every other id is as given.
+export function resolveMetaId(c: Caller, id: string): string {
+  const f = fleetScope(c);
+  return f && (id === "manager" || id === "lease" || id === "schedule") ? metaId(id, f) : id;
 }

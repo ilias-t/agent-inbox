@@ -156,6 +156,8 @@ export interface ScheduleView {
   schedule: Schedule;
   version: number | null; // null while meta/schedule has never been written (defaults)
   stored_invalid?: true; // meta/schedule exists but doesn't validate; `schedule` is the defaults
+  // A named fleet without hours of its own: `schedule` is the deployment's, and `version` its own doc's (null).
+  inherited?: true;
   computed: {
     now: string;
     in_hours: boolean;

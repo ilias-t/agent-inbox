@@ -2,7 +2,9 @@
 // lease is only writable through /api/lease, so its rules can't be bypassed.
 // meta/people (the people list before the users table) is neither read nor
 // written: /api/people and /api/users replaced it. Humans need the admin role
-// to write meta docs, the decider role to request a tick.
+// to write meta docs, the decider role to request a tick. Each fleet has its own
+// meta/manager (status, digest, tick request) and schedule: a named fleet's
+// token names them by their bare ids, as before fleets (docs/api.md "Fleets").
 
 import type { ManagerMeta } from "../../shared/types.ts";
 import { requireFull, requireFullRole, requireRole } from "../auth.ts";
@@ -11,22 +13,24 @@ import { docResponse, opRoute, type OpBuilder, type WriteOp } from "../ops.ts";
 import type { Ctx, Route } from "../router.ts";
 import { getDoc, mergePatch, mutate } from "../store.ts";
 import { checkSchedule } from "./schedule.ts";
-import { metaFleet, requireMetaFleet } from "../fleets.ts";
+import { metaFleet, metaId, requireMetaFleet, resolveMetaId, targetFleet } from "../fleets.ts";
 
 const PEOPLE_ONLY = "meta/people was replaced by the users table: use /api/people/me and /api/users";
 
 async function get(c: Ctx): Promise<Response> {
   requireFull(c.caller);
   if (c.params.id === "people") throw badRequest(PEOPLE_ONLY);
-  requireMetaFleet(c.caller, c.params.id);
-  const doc = await getDoc(c.env.DB, "meta", c.params.id);
-  if (!doc) throw notFound(`No meta/${c.params.id}`);
+  const id = resolveMetaId(c.caller, c.params.id);
+  requireMetaFleet(c.caller, id);
+  const doc = await getDoc(c.env.DB, "meta", id);
+  if (!doc) throw notFound(`No meta/${id}`);
   return json(doc);
 }
 
 function metaOp(mode: "put" | "patch"): OpBuilder {
-  return (c, id, body): WriteOp<Record<string, unknown>> => {
+  return (c, asked, body): WriteOp<Record<string, unknown>> => {
     requireFull(c.caller);
+    const id = resolveMetaId(c.caller, asked);
     const perFleet = metaFleet(id);
     if (id === "lease" || perFleet?.base === "lease") throw badRequest(`meta/${id} is written through /api/lease`);
     if (id === "people") throw badRequest(PEOPLE_ONLY);
@@ -51,13 +55,16 @@ function metaOp(mode: "put" | "patch"): OpBuilder {
 export const putMetaOp = metaOp("put");
 export const patchMetaOp = metaOp("patch");
 
+// The fleet's own meta/manager: a token's fleet, or the `fleet` a person names in the body (the default fleet's
+// without one).
 async function tickRequest(c: Ctx): Promise<Response> {
   requireFullRole(c.caller, "decider");
-  const note = optString(await c.body(), "note", 2000);
+  const body = await c.body();
+  const note = optString(body, "note", 2000);
   const { doc } = await mutate<ManagerMeta>(
     c.env.DB,
     "meta",
-    "manager",
+    metaId("manager", targetFleet(c.caller, body.fleet)),
     { actor: c.caller.actor, now: c.now },
     (cur) => ({ ...(cur?.data ?? {}), tick_requested_at: c.now, tick_requested_note: note || null }),
   );

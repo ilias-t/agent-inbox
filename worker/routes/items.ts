@@ -3,7 +3,7 @@
 
 import { validChoices } from "../../shared/choices.ts";
 import { LEASE_SESSION_HEADER, type Doc, type Item, type ItemStatus, type ItemType, type QaMessage, type QaRole } from "../../shared/types.ts";
-import { orchestratorScope, requireFleet, requireFullRole, requireHuman, requireRole, type Caller } from "../auth.ts";
+import { fleetScope, orchestratorScope, requireFleet, requireFullRole, requireHuman, requireRole, type Caller } from "../auth.ts";
 import type { Env } from "../env.ts";
 import {
   badRequest,
@@ -376,7 +376,7 @@ export function claimOp(c: Ctx, id: string, body: Record<string, unknown>): Writ
       const retake = d.status === "processing" && session !== null && by !== session;
       if (d.status !== "decided" && !retake) throw conflict("not_decided", `Item is ${d.status}`, cur);
       // Read after the item: whoever re-took it last took the lease first, so a stale session is refused here.
-      if (retake) await requireHeld(c.env.DB, session, c.now);
+      if (retake) await requireHeld(c.env.DB, session, c.now, fleetScope(c.caller) ?? null);
       const next: Item = { ...d, status: "processing", claimed_at: c.now, updated_at: c.now };
       if (session !== null) next.claimed_by = session;
       if (retake) next.reclaimed_from = by;
