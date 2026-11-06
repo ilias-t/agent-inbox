@@ -11,12 +11,14 @@ import { docResponse, opRoute, type OpBuilder, type WriteOp } from "../ops.ts";
 import type { Ctx, Route } from "../router.ts";
 import { getDoc, mergePatch, mutate } from "../store.ts";
 import { checkSchedule } from "./schedule.ts";
+import { metaFleet, requireMetaFleet } from "../fleets.ts";
 
 const PEOPLE_ONLY = "meta/people was replaced by the users table: use /api/people/me and /api/users";
 
 async function get(c: Ctx): Promise<Response> {
   requireFull(c.caller);
   if (c.params.id === "people") throw badRequest(PEOPLE_ONLY);
+  requireMetaFleet(c.caller, c.params.id);
   const doc = await getDoc(c.env.DB, "meta", c.params.id);
   if (!doc) throw notFound(`No meta/${c.params.id}`);
   return json(doc);
@@ -25,8 +27,10 @@ async function get(c: Ctx): Promise<Response> {
 function metaOp(mode: "put" | "patch"): OpBuilder {
   return (c, id, body): WriteOp<Record<string, unknown>> => {
     requireFull(c.caller);
-    if (id === "lease") throw badRequest("meta/lease is written through /api/lease");
+    const perFleet = metaFleet(id);
+    if (id === "lease" || perFleet?.base === "lease") throw badRequest(`meta/${id} is written through /api/lease`);
     if (id === "people") throw badRequest(PEOPLE_ONLY);
+    requireMetaFleet(c.caller, id);
     requireRole(c.caller, "admin"); // the schedule included
     if (!isObject(body.data)) throw badRequest("data must be an object");
     const input = body.data;
@@ -37,7 +41,7 @@ function metaOp(mode: "put" | "patch"): OpBuilder {
       build: (cur) => {
         if (mode === "patch" && !cur) throw notFound(`No meta/${id}`);
         const next = mode === "patch" ? mergePatch(cur!.data, input) : input;
-        return id === "schedule" ? { ...checkSchedule(next) } : next;
+        return id === "schedule" || perFleet?.base === "schedule" ? { ...checkSchedule(next) } : next;
       },
       respond: docResponse,
     };

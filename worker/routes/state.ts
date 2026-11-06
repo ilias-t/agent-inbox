@@ -42,7 +42,8 @@ async function state(c: Ctx): Promise<Response> {
   const limit = archivedLimit(c);
   const sel = (where: string, ...binds: unknown[]) =>
     db.prepare(`SELECT ${COLS} FROM docs WHERE ${where} ORDER BY created_at, id`).bind(...binds);
-  const inFleet = fleet === undefined ? "" : " AND fleet IS ?";
+  // `+fleet` beside orchestrator keeps a manager token's reads on docs_orchestrator (its few items).
+  const inFleet = fleet === undefined ? "" : scope !== null ? " AND +fleet IS ?" : " AND fleet IS ?";
   const fleetBinds = fleet === undefined ? [] : [fleet];
   const own = (scope === null ? "" : " AND orchestrator = ?") + inFleet;
   const ownBinds = [...(scope === null ? [] : [scope]), ...fleetBinds];

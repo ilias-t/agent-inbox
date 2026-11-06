@@ -108,7 +108,10 @@ async function guardedBatch<T>(c: Ctx, routine: string, stmts: D1PreparedStateme
   try {
     return (await db.batch<T>([fleetGuard(db, routine, fleetScope(c.caller) ?? null), ...stmts])).slice(1);
   } catch (e) {
-    checkRoutineFleet(c.caller, (await routineFleetSql(db, routine).first<{ fleet: string | null }>()) ?? undefined);
+    const row = await routineFleetSql(db, routine).first<{ fleet: string | null }>();
+    checkRoutineFleet(c.caller, row ?? undefined);
+    // The guard tripped on a routine that is gone again by now (deleted in between): the caller retries.
+    if (!row && fleetScope(c.caller) !== undefined) throw conflict("conflict", `Routine ${routine} changed during the write: retry`, null);
     throw e;
   }
 }
@@ -267,7 +270,6 @@ async function runView(c: Ctx): Promise<Response> {
   const { routine, stamp } = c.params;
   requireReader(c.caller, routine);
   if (!STAMP_RE.test(stamp)) throw badRequest('The stamp must look like "2026-10-08T180000Z"');
-  const db = c.env.DB;
   const row = await runInFleet(c, routine, stamp);
   if (!row) throw notFound(`No run ${routine}/${stamp}`);
   return json(toRun(row));

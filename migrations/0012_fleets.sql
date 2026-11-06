@@ -5,7 +5,7 @@
 -- row, so a token's change feed is a plain filter, as `changes.orchestrator`
 -- (0002) is for manager tokens.
 --
--- Safe on live data: it adds nullable columns, two indexes, and recreates the
+-- Safe on live data: it adds nullable columns, three indexes, and recreates the
 -- six change-log triggers on docs and review_routines with one more column.
 -- No existing row is written (nothing is backfilled: every row is the default
 -- fleet, which is NULL), and nothing is logged. The Worker that is live while
@@ -20,12 +20,15 @@
 --   SELECT collection, id FROM docs WHERE json_extract(data, '$.fleet') IS NOT NULL;
 --
 -- Rolling back, in this order (SQLite refuses to drop a column an index or a
--- trigger names):
---   DROP INDEX docs_fleet; DROP INDEX changes_fleet;
---   DROP TRIGGER docs_ai, docs_au, docs_ad, review_routines_ai, _au, _ad, then
---   create docs_* again as 0002 has them and review_routines_* as 0009 has them;
+-- trigger names; test/worker/migration-fleets.test.ts runs exactly this):
+--   DROP INDEX docs_fleet; DROP INDEX changes_fleet; DROP INDEX changes_shared;
+--   DROP TRIGGER docs_ai; DROP TRIGGER docs_au; DROP TRIGGER docs_ad;
+--   DROP TRIGGER review_routines_ai; DROP TRIGGER review_routines_au; DROP TRIGGER review_routines_ad;
+--   the three CREATE TRIGGER docs_* statements of 0002, and the three
+--   CREATE TRIGGER review_routines_* statements of 0009, copied from those files;
 --   ALTER TABLE docs DROP COLUMN fleet; ALTER TABLE changes DROP COLUMN fleet;
---   ALTER TABLE tokens DROP COLUMN fleet; ALTER TABLE review_routines DROP COLUMN fleet.
+--   ALTER TABLE tokens DROP COLUMN fleet; ALTER TABLE review_routines DROP COLUMN fleet;
+--   DELETE FROM d1_migrations WHERE name = '0012_fleets.sql' (so it applies again).
 -- A Worker from before fleets doesn't read tokens.fleet, so under it every
 -- token reads and writes every fleet again. Roll the Worker back only while no
 -- named fleet is in use; once one is, revoke every token you don't trust with
@@ -42,6 +45,9 @@ ALTER TABLE review_routines ADD COLUMN fleet TEXT;     -- the fleet of the token
 
 ALTER TABLE changes ADD COLUMN fleet TEXT;
 CREATE INDEX changes_fleet ON changes (fleet, seq);
+-- The rows every fleet sees (people, shared meta, a person's own snoozes and
+-- pins), so a named fleet's feed reads them without the default fleet's rows.
+CREATE INDEX changes_shared ON changes (seq) WHERE fleet IS NULL AND collection IN ('users', 'meta', 'snoozes', 'pins');
 
 -- 0002's triggers plus the fleet each change belongs to, at write time: an
 -- item's or manager doc's own fleet, a qa message's parent item's fleet, the

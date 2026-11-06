@@ -32,6 +32,7 @@ const rollback = () =>
     [
       "DROP INDEX docs_fleet",
       "DROP INDEX changes_fleet",
+      "DROP INDEX changes_shared",
       ...["docs_ai", "docs_au", "docs_ad", "review_routines_ai", "review_routines_au", "review_routines_ad"].map((t) => `DROP TRIGGER ${t}`),
       ...triggersOf("0002", "docs"),
       ...triggersOf("0009", "review_routines"),

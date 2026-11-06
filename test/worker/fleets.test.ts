@@ -347,6 +347,21 @@ describe("moves between fleets", () => {
     }
     expect(ids((await B.get(`/api/state/delta?since=${c0}`)).body.orchestrators)).toEqual([o]);
   });
+
+  it("drop a manager token's moved item once, and say nothing of it after", async () => {
+    const o = uid("I");
+    const mgr = agent((await mintFleetToken("fa", "orchestrator", o)).secret);
+    const id = uid("mgr-moved");
+    await mgr.put(`/api/items/${id}`, { data: { type: "info", title: "m", orchestrator: o } });
+    const c0 = await cursorNow();
+    await human.patch(`/api/items/${id}`, { data: { fleet: "fb" } });
+    expect((await mgr.get(`/api/state/delta?since=${c0}`)).body.deleted).toEqual([{ collection: "items", id }]);
+    const c1 = await cursorNow();
+    await B.patch(`/api/items/${id}`, { data: { summary: "fb's" } });
+    const d = (await mgr.get(`/api/state/delta?since=${c1}`)).body;
+    expect([d.items, d.deleted]).toEqual([[], []]);
+    expect(d).not.toHaveProperty("archived_total");
+  });
 });
 
 describe("review routines of another fleet", () => {
@@ -398,5 +413,36 @@ describe("shared meta docs", () => {
     expect((await human.put("/api/meta/notes:v1", { data: { x: 1 } })).status).toBeLessThan(300);
     const rows = (await D.get(`/api/changes?since=${c0}`)).body.changes.map((r: any) => r.doc_id);
     expect(rows).toContain("notes:v1");
+  });
+});
+
+describe("per-fleet meta docs", () => {
+  it("a token reads and writes only its own fleet's (manager:<fleet>, schedule:<fleet>), and lease:* only through /api/lease", async () => {
+    const refused = [
+      await A.put("/api/meta/manager:fb", { data: { note: "x" } }),
+      await A.get("/api/meta/manager:fb"),
+      await D.put("/api/meta/schedule:fa", { data: {} }),
+      await A.put("/api/meta/manager:default", { data: { note: "x" } }),
+    ];
+    expect(refused.map((r) => r.status)).toEqual([403, 403, 403, 403]);
+    expect((await A.put("/api/meta/manager:fa", { data: { note: "mine" } })).status).toBeLessThan(300);
+    expect((await A.put("/api/meta/lease:fa", { data: {} })).status).toBe(400);
+    expect((await human.put("/api/meta/lease:fa", { data: {} })).status).toBe(400);
+    expect((await human.put("/api/meta/schedule:fa", { data: { work_hours: "nope" } })).status).toBe(400);
+  });
+});
+
+describe("archived_total across moves", () => {
+  it("recounts when an archived item moves into or out of the fleet", async () => {
+    const id = uid("arch-move");
+    await A.put(`/api/items/${id}`, { data: { type: "info", title: "a" } });
+    await human.post(`/api/items/${id}/archive`);
+    for (const to of ["fb", "fa"]) {
+      const c0 = await cursorNow();
+      await human.patch(`/api/items/${id}`, { data: { fleet: to } });
+      for (const c of [A, B]) {
+        expect((await c.get(`/api/state/delta?since=${c0}`)).body.archived_total, to).toBe((await c.get("/api/state")).body.archived_total);
+      }
+    }
   });
 });

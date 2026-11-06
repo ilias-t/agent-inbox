@@ -174,7 +174,7 @@ async function listItems(c: Ctx): Promise<Response> {
   // A token's own fleet, or a human's ?fleet=.
   const fleet = fleetFilter(c.caller, q);
   if (fleet !== undefined) {
-    where.push("AND fleet IS ?");
+    where.push(orchestrator ? "AND +fleet IS ?" : "AND fleet IS ?"); // with orchestrator: stay on docs_orchestrator
     binds.push(fleet);
   }
   const qa = q.get("qa_pending");

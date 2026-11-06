@@ -55,11 +55,13 @@ function head(view: View): string {
   //
   // A fleet's token: as /api/changes (FLEET_FILTER there). A doc an admin moved out of its fleet comes with
   // the rest: the move logs a row under the fleet it left (migration 0012), which the doc fails visibleDocs on.
-  // `+fleet` keeps a manager token's rows on changes_orchestrator.
+  // `+fleet` keeps a manager token's rows on changes_orchestrator. Its reassigned-away clause takes only rows in its
+  // own fleet: a move out logs under its fleet and orchestrator, and what happens to the doc in another fleet later
+  // isn't its business.
   const scope =
     view === "manager"
       ? `AND ((orchestrator = ?2 AND +fleet IS ?6) OR (collection = 'meta' AND doc_id = 'schedule')
-         OR (collection = 'items' AND doc_id IN (SELECT doc_id FROM changes WHERE orchestrator = ?2 AND +fleet IS ?6 AND collection = 'items')))`
+         OR (collection = 'items' AND +fleet IS ?6 AND doc_id IN (SELECT doc_id FROM changes WHERE orchestrator = ?2 AND +fleet IS ?6 AND collection = 'items')))`
       : view === "fleet" || view === "named"
         ? `AND ${fleetChangesSql(view === "named", "?6")}`
         : "";
@@ -120,7 +122,8 @@ async function delta(c: Ctx): Promise<Response> {
   const binds = [since, scope ?? "", email ? `human:${email}` : "", email, c.now, fleet ?? null];
   const pre = head(view);
   const stmt = (sql: string) => db.prepare(pre + sql).bind(...binds);
-  const own = view === "manager" ? " AND orchestrator = ?2 AND fleet IS ?6" : view === "all" ? "" : " AND fleet IS ?6";
+  // `+fleet` beside orchestrator keeps a manager token's count on docs_orchestrator (its few items).
+  const own = view === "manager" ? " AND orchestrator = ?2 AND +fleet IS ?6" : view === "all" ? "" : " AND fleet IS ?6";
 
   const [top, keys, docs, users, snoozes, pins, routines] = await db.batch<any>([
     stmt(`SELECT head.cursor, ok.ok,

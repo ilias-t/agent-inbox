@@ -3,7 +3,7 @@
 
 import { DEFAULT_FLEET, FLEET_ID_RE } from "../shared/types.ts";
 import { fleetScope, requireFleet, type Caller } from "./auth.ts";
-import { badRequest, conflict, HttpError, notFound } from "./http.ts";
+import { badRequest, conflict, forbidden, HttpError, notFound } from "./http.ts";
 import type { Ctx } from "./router.ts";
 import { getDoc, type DeletePin } from "./store.ts";
 
@@ -91,5 +91,22 @@ export async function deleteInFleet(
 // rows with no fleet at all, so with one fleet that is every row, as before fleets (and one range of the
 // changes_fleet index). A named fleet's (`p` binds it) are its own, and the deployment-wide rows, which log no
 // fleet: people, shared meta docs, and a person's own snoozes and pins (which only that person ever gets).
-export const fleetChangesSql = (named: boolean, p: string) =>
-  named ? `(fleet = ${p} OR (fleet IS NULL AND collection IN ('users', 'meta', 'snoozes', 'pins')))` : "fleet IS NULL";
+export const fleetChangesSql = (named: boolean, p: string) => (named ? `(fleet = ${p} OR (${SHARED_CHANGES}))` : "fleet IS NULL");
+
+// The deployment-wide change rows, word for word the condition of migration 0012's partial index changes_shared,
+// so a query that names it can read just those rows.
+export const SHARED_CHANGES = "fleet IS NULL AND collection IN ('users', 'meta', 'snoozes', 'pins')";
+
+// A per-fleet meta doc's id is `<base>:<fleet>` (`manager:side-a`), and migration 0012 logs its changes under that
+// fleet. The fleet it names: null for `<base>:default`, undefined for any other id (a doc every fleet shares).
+const PER_FLEET_META = /^(manager|lease|schedule):(.*)$/;
+export function metaFleet(id: string): { base: string; fleet: string | null } | undefined {
+  const m = PER_FLEET_META.exec(id);
+  return m ? { base: m[1], fleet: m[2] === DEFAULT_FLEET ? null : m[2] } : undefined;
+}
+
+// A token reads and writes another fleet's per-fleet meta doc never: 403.
+export function requireMetaFleet(c: Caller, id: string): void {
+  const own = fleetScope(c), named = metaFleet(id);
+  if (own !== undefined && named && named.fleet !== own) throw forbidden(`meta/${id} belongs to another fleet`);
+}
