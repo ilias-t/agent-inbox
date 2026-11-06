@@ -161,6 +161,14 @@ describe("minting a token for a fleet", () => {
     expect((await A.put(`/api/orchestrators/${O}`, { data: { goal: "take" } })).status).toBe(403);
     expect((await A.post("/api/batch", { ops: [{ op: "orchestrator.put", id: O, data: { goal: "take" } }] })).status).toBe(403);
     expect((await human.get(`/api/orchestrators/${O}`)).status).toBe(404);
+    // A revoked token holds nothing; a review routine holds its id like a live token.
+    const Q = uid("revoked");
+    const q = await mint({ scope: "orchestrator", orchestrator: Q, fleet: "fb" });
+    expect((await human.del(`/api/tokens/${q.body.token.id}`)).status).toBe(200);
+    expect((await A.put(`/api/orchestrators/${Q}`, { data: { goal: "free" } })).status).toBe(201);
+    const R = uid("routine");
+    await env.DB.prepare("INSERT INTO review_routines (routine, version, updated_at, fleet) VALUES (?, 1, 'x', 'fb')").bind(R).run();
+    expect((await A.put(`/api/orchestrators/${R}`, { data: { goal: "take" } })).status).toBe(403);
     // Its own fleet's token may, and so may a person.
     const B = agent((await mintFleetToken("fb")).secret);
     expect((await B.put(`/api/orchestrators/${O}`, { data: { goal: "mine" } })).status).toBe(201);
@@ -182,6 +190,8 @@ describe("unknown fleets", () => {
       ["schedule del", human.del("/api/schedule?fleet=typo")],
       ["tick", human.post("/api/meta/manager/tick-request", { fleet: "typo" })],
       ["meta put", human.put("/api/meta/manager:typo", { data: { x: 1 } })],
+      ["meta patch", human.patch("/api/meta/manager:typo", { data: { x: 1 } })],
+      ["batch meta patch", human.post("/api/batch", { ops: [{ op: "meta.patch", id: "schedule:typo", data: { x: 1 } }] })],
       ["batch meta", human.post("/api/batch", { ops: [{ op: "meta.put", id: "manager", data: { x: 1 } }, { op: "meta.put", id: "manager:typo", data: { x: 1 } }] })],
       ["item move", human.patch(`/api/items/${id}`, { data: { fleet: "typo" } })],
       ["item put", human.put(`/api/items/${uid("i")}`, { data: { type: "info", title: "t", fleet: "typo" } })],
@@ -250,12 +260,20 @@ describe("people's fleets map", () => {
     const d = (await human.get(`/api/state/delta?since=${cursor}`)).body;
     expect(Object.keys(d.fleets)).toEqual(["fb"]);
     expect(d.fleets.fb.doc.data.label).toBe("B2");
+    expect(Object.keys(d.fleets.fb).sort()).toEqual(["doc", "lease", "manager", "schedule"]); // a registry change: whole
+    // A lease renewal brings that fleet's lease alone, not its digest.
+    const c1 = d.cursor;
+    await human.post("/api/lease/renew?fleet=fb", { session_id: "fb-s" });
+    const dl = (await human.get(`/api/state/delta?since=${c1}`)).body;
+    expect(Object.keys(dl.fleets)).toEqual(["fb"]);
+    expect(Object.keys(dl.fleets.fb)).toEqual(["lease"]);
     // The deployment's hours reach every fleet (those without their own inherit them).
-    const c2 = d.cursor;
+    const c2 = dl.cursor;
     const sched = (await human.get("/api/schedule")).body.schedule;
     await human.put("/api/schedule", { schedule: { ...sched, sweep_interval_min: sched.sweep_interval_min === 30 ? 45 : 30 } });
     const d2 = (await human.get(`/api/state/delta?since=${c2}`)).body;
     expect(Object.keys(d2.fleets)).toEqual(expect.arrayContaining(["default", "fa", "fb"]));
+    expect(Object.keys(d2.fleets.fb)).toEqual(["schedule"]);
     // An item change alone brings no map.
     const c3 = d2.cursor;
     await createItem(uid("i"));

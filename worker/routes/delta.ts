@@ -13,7 +13,7 @@ import type {
   StateDelta,
   StateDeltaReset,
 } from "../../shared/types.ts";
-import { DEFAULT_FLEET } from "../../shared/types.ts";
+import { DEFAULT_FLEET, type FleetState } from "../../shared/types.ts";
 import { fleetScope, orchestratorScope } from "../auth.ts";
 import { fleetChangesSql, metaFleet, metaId } from "../fleets.ts";
 import { badRequest, json } from "../http.ts";
@@ -119,14 +119,16 @@ const META_SQL = `SELECT ${COLS} FROM docs WHERE collection = 'meta'
 const FLEET_PART = `(collection = 'fleets' OR (collection = 'meta' AND (doc_id IN ('manager', 'lease', 'schedule')
   OR doc_id GLOB 'manager:*' OR doc_id GLOB 'lease:*' OR doc_id GLOB 'schedule:*')))`;
 
-// The fleets whose entry a change to (collection, id) touches: "*" for every fleet.
-function fleetTouched(collection: string, id: string): string | undefined {
-  if (collection === "fleets") return id;
+// Which fleet's entry, and which part of it, a change to (collection, id) touches: fleet "*" for every fleet, part
+// "all" for the whole entry (a registry doc's change, which is how a new fleet first reaches a page).
+type FleetPart = "all" | "manager" | "lease" | "schedule";
+function fleetTouched(collection: string, id: string): { fleet: string; part: FleetPart } | undefined {
+  if (collection === "fleets") return { fleet: id, part: "all" };
   if (collection !== "meta") return undefined;
-  if (id === "schedule") return "*";
-  if (id === "manager" || id === "lease") return DEFAULT_FLEET;
+  if (id === "schedule") return { fleet: "*", part: "schedule" }; // the hours every fleet without its own inherits
+  if (id === "manager" || id === "lease") return { fleet: DEFAULT_FLEET, part: id };
   const named = metaFleet(id);
-  return named ? (named.fleet ?? DEFAULT_FLEET) : undefined;
+  return named ? { fleet: named.fleet ?? DEFAULT_FLEET, part: named.base as FleetPart } : undefined;
 }
 
 const D_COLS = COLS.split(", ").map((col) => `d.${col}`).join(", ");
@@ -188,10 +190,10 @@ async function delta(c: Ctx): Promise<Response> {
   if (archived !== null) body.archived_total = archived;
   const qa = new Set<string>();
   const reviews: string[] = [];
-  const fleets = new Set<string>();
+  const fleetParts: { fleet: string; part: FleetPart }[] = [];
   for (const { collection, doc_id: id } of keys.results as { collection: string; doc_id: string }[]) {
     const touched = view === "all" ? fleetTouched(collection, id) : undefined;
-    if (touched !== undefined) fleets.add(touched);
+    if (touched !== undefined) fleetParts.push(touched);
     if (collection === "items" || collection === "orchestrators") {
       const row = found(collection, id);
       if (!row) body.deleted.push({ collection, id });
@@ -228,9 +230,19 @@ async function delta(c: Ctx): Promise<Response> {
     body.reviews_changed = reviews; // keys come sorted
     body.routines = routines.results.map(routineState);
   }
-  if (fleets.size) {
-    const map = fleetsMap(fleetRows.results as DocRow[], new Date(c.now), fleets.has("*") ? undefined : fleets);
-    if (Object.keys(map).length) body.fleets = map;
+  // Each touched fleet's changed parts only (a lease renewal carries the lease, not the digest beside it); a fleet
+  // whose registry doc changed comes whole. Fleets that aren't registered are left out, as in /api/state.
+  if (fleetParts.length) {
+    const map = fleetsMap(fleetRows.results as DocRow[], new Date(c.now));
+    const whole = new Set(fleetParts.filter((t) => t.part === "all").map((t) => t.fleet));
+    const out: Record<string, Partial<FleetState>> = {};
+    for (const { fleet, part } of fleetParts) {
+      for (const id of fleet === "*" ? Object.keys(map) : [fleet]) {
+        if (!map[id]) continue;
+        out[id] = whole.has(id) ? map[id] : { ...out[id], [part]: map[id][part as Exclude<FleetPart, "all">] };
+      }
+    }
+    if (Object.keys(out).length) body.fleets = out;
   }
   return json(body);
 }

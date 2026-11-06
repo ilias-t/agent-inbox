@@ -43,14 +43,17 @@ async function get(c: Ctx): Promise<Response> {
   return json(doc);
 }
 
-// A token creating a manager doc can't take an id another fleet's live manager token holds (docs/api.md "Fleets":
-// manager ids stay global). A read, not part of the write: a mint racing this create can at worst leave a token
-// whose writes its doc refuses, never one that reaches another fleet.
+// A token creating a manager doc can't take an id another fleet owns through a review routine or a live manager token
+// (docs/api.md "Fleets": manager ids stay global; minting reads the same owners). A read, not part of the write: a
+// mint racing this create can at worst leave a token whose writes its doc refuses, never one that reaches another
+// fleet.
 async function requireIdFree(c: Ctx, id: string): Promise<void> {
   const own = fleetScope(c.caller);
   if (own === undefined) return;
   const row = await c.env.DB.prepare(
-    "SELECT 1 AS taken FROM tokens WHERE scope = 'orchestrator' AND orchestrator = ? AND revoked_at IS NULL AND nullif(fleet, 'default') IS NOT ? LIMIT 1",
+    `SELECT 1 AS taken FROM review_routines WHERE routine = ?1 AND nullif(fleet, 'default') IS NOT ?2
+     UNION ALL SELECT 1 FROM tokens WHERE scope = 'orchestrator' AND orchestrator = ?1 AND revoked_at IS NULL AND nullif(fleet, 'default') IS NOT ?2
+     LIMIT 1`,
   )
     .bind(id, own)
     .first();

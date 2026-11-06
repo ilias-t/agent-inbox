@@ -63,6 +63,12 @@ test("An admin adds a fleet and mints an orchestrator token for it", async ({ pa
   await expect(fleets).toContainText("Side project A");
 
   const tokens = page.getByRole("region", { name: "Agent tokens" });
+  // A manager token starts on its manager id's fleet; an orchestrator token can't pick that.
+  const fleet = tokens.getByLabel("Fleet", { exact: true });
+  await tokens.getByLabel("Scope").selectOption("orchestrator");
+  await expect(fleet).toHaveValue("");
+  await tokens.getByLabel("Scope").selectOption("manager");
+  await expect(fleet).toHaveValue("default");
   await tokens.getByLabel("Name", { exact: true }).fill(`orch-${id}`);
   await tokens.getByLabel("Fleet", { exact: true }).selectOption(id);
   await tokens.getByRole("button", { name: "Create token" }).click();

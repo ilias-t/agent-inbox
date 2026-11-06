@@ -357,7 +357,9 @@ async function loadFleets(): Promise<void> {
   try { flt.list = await store.listFleets(); flt.failed = ""; }
   catch { flt.failed = "Couldn't load fleets."; }
   renderFleets();
-  if (document.getElementById("tok-form") && !tok.busy) renderTokens(); // the fleet select's choices
+  // The token form's fleet choices, without rebuilding the form (someone may be typing in it).
+  const sel = document.getElementById("tok-fleet") as HTMLSelectElement | null;
+  if (sel) { sel.innerHTML = fleetOptions(); sel.value = tok.fleet; }
 }
 function fleetRow(f: Doc<Fleet>): string {
   const d = f.data;

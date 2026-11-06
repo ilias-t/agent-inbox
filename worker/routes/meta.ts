@@ -53,8 +53,8 @@ function metaOp(mode: "put" | "patch"): OpBuilder {
       id,
       ifVersion: ifVersion(body.if_version),
       build: async (cur) => {
+        await requireMetaRegistered(c, id); // a person's `meta/manager:<fleet>` names a registered fleet (before a 404)
         if (mode === "patch" && !cur) throw notFound(`No meta/${id}`);
-        await requireMetaRegistered(c, id); // a person's `meta/manager:<fleet>` names a registered fleet
         const next = mode === "patch" ? mergePatch(cur!.data, input) : input;
         return id === "schedule" || perFleet?.base === "schedule" ? { ...checkSchedule(next) } : next;
       },

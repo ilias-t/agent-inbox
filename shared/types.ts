@@ -267,7 +267,8 @@ export interface StateResponse {
 }
 
 // GET /api/state/delta?since=<cursor>: what changed in the caller's /api/state since a cursor (docs/api.md,
-// "State delta"). Optional fields are present only when they changed: present means replace (null included).
+// "State delta"). Optional fields are present only when they changed: present means replace (null included),
+// except `fleets`, merged entry by entry and part by part.
 export interface StateDelta {
   cursor: number; // the next ?since=, the same cursor a fresh /api/state would report
   items: Doc<Item>[]; // current version of every item that changed (upsert by id)
@@ -284,7 +285,9 @@ export interface StateDelta {
   archived_total?: number; // when an item may have entered or left the archive
   reviews_changed?: string[]; // routine ids whose review data changed: refetch GET /api/reviews/:routine if shown
   routines?: RoutineState[]; // the whole list, as in /api/state, when reviews_changed is present
-  fleets?: Record<string, FleetState>; // people only: the whole map, as in /api/state, when any part of it changed
+  // People only: for each fleet whose entry changed, the parts that changed (all four for a fleet whose registry doc
+  // changed); merge part by part into the held entry, keeping fleets and parts left out (docs/api.md "State delta").
+  fleets?: Record<string, Partial<FleetState>>;
 }
 
 // Too far behind (changes pruned, or more than the cap): fetch /api/state instead.

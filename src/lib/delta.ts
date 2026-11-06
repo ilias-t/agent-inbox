@@ -1,7 +1,7 @@
 // Live updates apply GET /api/state/delta to the /api/state the page holds instead of refetching the whole
 // snapshot (docs/api.md, "State delta": the merge contract). Pure, so test/worker/delta.test.ts checks this very
 // function against the real server: a snapshot with every delta since applied equals a fresh /api/state.
-import type { Doc, Principal, StateDelta, StateDeltaResponse, StateResponse } from "../../shared/types.ts";
+import type { Doc, FleetState, Principal, StateDelta, StateDeltaResponse, StateResponse } from "../../shared/types.ts";
 
 // The delta can't be merged (a reset, a cursor going backwards, another identity, a malformed body): the caller
 // fetches the full /api/state instead.
@@ -62,11 +62,20 @@ export function mergeDelta(s: StateResponse, d: StateDeltaResponse): StateRespon
   if (d.pins) next.pins = d.pins;
   if (typeof d.archived_total === "number") next.archived_total = d.archived_total;
   if (Array.isArray(d.routines)) next.routines = d.routines;
-  // Entry by entry: fleets are never deleted, so the ones a delta leaves out are unchanged. A snapshot without the
-  // map (from a Worker before it) can't take part of one: refetch.
+  // Entry by entry and part by part: fleets are never deleted, so the fleets and parts a delta leaves out are
+  // unchanged. A snapshot without the map (from a Worker before it), or a part of an entry it doesn't hold, can't be
+  // merged: refetch.
   if (d.fleets && typeof d.fleets === "object") {
     if (!s.fleets) throw new DeltaMismatch("fleets without a map to merge into");
-    next.fleets = { ...s.fleets, ...d.fleets };
+    const fleets = { ...s.fleets };
+    for (const [id, part] of Object.entries(d.fleets)) {
+      const held = fleets[id];
+      if (!held && !(part && "doc" in part && "manager" in part && "lease" in part && "schedule" in part)) {
+        throw new DeltaMismatch(`part of fleet ${id}, which the snapshot doesn't hold`);
+      }
+      fleets[id] = { ...held, ...part } as FleetState;
+    }
+    next.fleets = fleets;
   }
   return next;
 }

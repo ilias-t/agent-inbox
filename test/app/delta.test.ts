@@ -137,8 +137,20 @@ describe("mergeDelta: a delta applied to the /api/state the client holds", () =>
       expect(mergeDelta(s, delta()).fleets).toBe(s.fleets);
     });
 
-    it("refetches when the snapshot it holds has no map to merge into", () => {
+    it("merges a part of an entry into the held one", () => {
+      const s = snapshot({ fleets: { fa: entry("A") } as StateResponse["fleets"] });
+      const lease = { ...orch("lease:fa", 3), data: {} } as unknown as NonNullable<StateResponse["fleets"]>[string]["lease"];
+      const next = mergeDelta(s, delta({ fleets: { fa: { lease } } }));
+      expect(next.fleets!.fa.lease).toBe(lease);
+      expect(next.fleets!.fa.doc).toBe(s.fleets!.fa.doc);
+      expect(next.fleets!.fa.schedule).toBe(s.fleets!.fa.schedule);
+    });
+
+    it("refetches when it holds no map, or no entry for a part, to merge into", () => {
       expect(() => mergeDelta(snapshot(), delta({ fleets: { fa: entry("A") } as StateDelta["fleets"] }))).toThrow(DeltaMismatch);
+      const s = snapshot({ fleets: { default: entry("D") } as StateResponse["fleets"] });
+      expect(() => mergeDelta(s, delta({ fleets: { fb: { lease: null } } }))).toThrow(DeltaMismatch);
+      expect(Object.keys(mergeDelta(s, delta({ fleets: { fb: entry("B") } as StateDelta["fleets"] })).fleets!)).toEqual(["default", "fb"]);
     });
   });
 });
