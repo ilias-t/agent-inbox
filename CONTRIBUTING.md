@@ -49,6 +49,8 @@ npm run e2e:ui                    # Playwright's UI mode: pick tests, watch them
 npx playwright test --headed      # watch it in a real browser window
 ```
 
+The README's screenshots (`docs/screenshots/*.png`) come from the same seed data. After a visible UI change, regenerate them with `npm run screenshots` (`e2e/screenshots.spec.ts`, skipped unless `SCREENSHOTS=1`), and look at each image before you commit it.
+
 How it runs (`e2e/global-setup.ts`): build the UI (skip with `E2E_SKIP_BUILD=1` when `dist/` is current), recreate a local D1 in `.wrangler/e2e` (migrations, plus an orchestrator token minted with `scripts/create-token.mjs`), then start `wrangler dev` on free ports with `e2e/dev.env` (`DEV_NO_ACCESS=1`) in place of your `.dev.vars`. Your own `.wrangler/state`, `.dev.vars` and a `wrangler dev` you already have running are left alone. The server stops when the run ends; its output is in `.wrangler/e2e/wrangler.log`.
 
 Every test starts from the seed data (`scripts/fixtures/sample-export.json`): the `seeded` fixture in `e2e/fixtures.ts` empties the docs table and reseeds it before each test, so tests don't depend on order. They share one server and database, so they run one at a time.

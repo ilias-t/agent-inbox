@@ -36,6 +36,7 @@
     "check": "npm run typecheck && npm test && npm run build",
     "e2e": "tsc -p tsconfig.e2e.json && playwright test",
     "e2e:ui": "playwright test --ui",
+    "screenshots": "SCREENSHOTS=1 npm run e2e -- e2e/screenshots.spec.ts",
     "db:migrate:local": "wrangler d1 migrations apply agent-inbox --local",
     "db:migrate:remote": "wrangler d1 migrations apply agent-inbox --remote",
     "seed:local": "node scripts/seed.mjs --local",
