@@ -66,7 +66,8 @@ export function mergeDelta(s: StateResponse, d: StateDeltaResponse): StateRespon
   // unchanged. A snapshot without the map (from a Worker before it), or a part of an entry it doesn't hold, can't be
   // merged: refetch.
   if (d.fleets !== undefined) {
-    if (!d.fleets || typeof d.fleets !== "object" || Object.values(d.fleets).some((p) => !p || typeof p !== "object")) {
+    const plain = (x: unknown) => !!x && typeof x === "object" && !Array.isArray(x);
+    if (!plain(d.fleets) || Object.values(d.fleets).some((p) => !plain(p))) {
       throw new DeltaMismatch("malformed fleets");
     }
     if (!s.fleets) throw new DeltaMismatch("fleets without a map to merge into");

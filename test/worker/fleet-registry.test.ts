@@ -242,6 +242,19 @@ describe("unknown fleets", () => {
   });
 });
 
+describe("fleet docs in the change feed", () => {
+  it("reach only their own fleet's token", async () => {
+    const since = (await human.get("/api/changes")).body.cursor;
+    await human.patch("/api/fleets/fb", { data: { label: uid("b") } });
+    await human.patch("/api/fleets/fa", { data: { label: uid("a") } });
+    const seen = async (t: Client) => ((await t.get(`/api/changes?since=${since}`)).body.changes as { collection: string; doc_id: string }[])
+      .filter((c) => c.collection === "fleets").map((c) => c.doc_id);
+    expect(await seen(A)).toEqual(["fa"]);
+    expect(await seen(D)).toEqual([]);
+    expect((await human.get(`/api/changes?since=${since}`)).body.changes.filter((c: { collection: string }) => c.collection === "fleets")).toHaveLength(2);
+  });
+});
+
 describe("people's fleets map", () => {
   it("lists default and every registered fleet with its own status, lease and hours; tokens get none", async () => {
     await human.put("/api/fleets/fb", { data: { label: "Fleet B", color: "#123456" } });
@@ -256,6 +269,9 @@ describe("people's fleets map", () => {
     expect(fb.schedule.inherited).toBe(true);
     expect(s.fleets!.default.manager?.id ?? null).toBe(s.manager?.id ?? null);
     expect(s.fleets!.default.lease).toEqual(s.lease);
+    const { computed: _a, ...top } = s.schedule;
+    const { computed: _b, ...own } = s.fleets!.default.schedule;
+    expect(own).toEqual(top);
     // A meta doc of a fleet that isn't registered doesn't make an entry.
     expect(s.fleets).not.toHaveProperty("unlisted");
     for (const t of [A, D, M]) expect((await t.get("/api/state")).body).not.toHaveProperty("fleets");

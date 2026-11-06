@@ -11,7 +11,7 @@ cat > ~/.config/agent-inbox/config.json <<'EOF'
 {"url": "https://<your-host>/agent", "token": "ait_<orchestrator token>"}
 EOF
 chmod 600 ~/.config/agent-inbox/config.json
-agent-inbox me          # token manager (manager)
+agent-inbox me          # token manager (manager) fleet default
 ```
 
 `https://<your-host>` is the deployment's `PUBLIC_URL` in `wrangler.jsonc` (`vars.PUBLIC_URL`); the agent URL is that plus `/agent`. An orchestrator that is already set up has it as `url` in `~/.config/agent-inbox/config.json`: read it from there rather than guessing.
