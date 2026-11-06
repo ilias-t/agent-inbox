@@ -1024,9 +1024,9 @@ describe("fleets", () => {
     const r = await run(["fleets"]);
     expect(r.code).toBe(0);
     expect(r.stdout).toMatch(/^side-a {2}"Side A"/);
-    // A manager token can't read the registry: no label.
+    // A server from before the registry: no label.
     handler = (req) =>
-      req.path.startsWith("/agent/api/fleets") ? { status: 403, body: { error: "forbidden", message: "no" } } : { body: { me: token(), manager: null, lease: null, schedule: sched() } };
+      req.path.startsWith("/agent/api/fleets") ? { status: 404, body: { error: "not_found", message: "Not found" } } : { body: { me: token(), manager: null, lease: null, schedule: sched() } };
     expect((await run(["fleets"])).stdout).toMatch(/^default\n/);
   });
 
@@ -1046,7 +1046,7 @@ describe("fleets", () => {
     handler = (req) => (req.path === "/agent/api/me" ? { body: token("side-a") } : { body: { items: [] } });
     const refused = await run(["items", "--fleet", "side-b"]);
     expect(refused.code).toBe(1);
-    expect(refused.stderr).toContain("belongs to fleet side-a");
+    expect(refused.stderr).toBe("agent-inbox: this token belongs to fleet side-a, so it sees only that fleet (not side-b)\n");
     expect((await run(["items", "--fleet", "side-a"])).code).toBe(0); // its own: a no-op
     expect((await run(["items", "--fleet", "Bad"])).code).toBe(2);
   });
@@ -1078,9 +1078,69 @@ describe("fleets", () => {
     expect((await run(["state", "--fleet", "nope"])).code).toBe(1);
   });
 
+  it("state --fleet <own> works for a named fleet's token, from the top-level status it gets", async () => {
+    handler = () => ({
+      body: { me: token("side-a"), items: [doc("a1", { status: "open", type: "info", title: "A", fleet: "side-a" })], orchestrators: [], manager: doc("manager:side-a", {}), lease: null, schedule: sched(), cursor: 3, archived_total: 0 },
+    });
+    const r = await run(["state", "--fleet", "side-a"]);
+    expect(r.code, r.stderr).toBe(0);
+    expect(r.stdout).toContain("fleet: side-a");
+    expect(seen.map((x) => x.path)).toEqual(["/agent/api/state"]); // no extra call for a token's own fleet
+  });
+
+  it("fleets tells a manager token its fleet's status isn't visible to it, rather than showing it empty", async () => {
+    handler = (req) =>
+      req.path.startsWith("/agent/api/fleets")
+        ? { status: 500, body: { error: "internal", message: "not called" } }
+        : { body: { me: { kind: "token", name: "orch-S1", scope: "orchestrator", orchestrator: "S1", fleet: "side-a" }, manager: null, lease: null, schedule: sched() } };
+    const r = await run(["fleets"]);
+    expect(r.code, r.stderr).toBe(0);
+    expect(r.stdout).toContain("side-a\n  lease and status: not visible to a manager token\n  in hours");
+    expect(r.stdout).not.toContain("lease free");
+    expect(JSON.parse((await run(["fleets", "--json"])).stdout).status_visible).toBe(false);
+  });
+
+  it("fleets shows a person the default fleet on a server from before the registry", async () => {
+    handler = (req) =>
+      req.path.startsWith("/agent/api/fleets")
+        ? { status: 404, body: { error: "not_found", message: "Not found" } }
+        : { body: { me: { kind: "human", email: "a@b.c", role: "admin", is_admin: true }, manager: null, lease: null, schedule: sched({ version: null }) } };
+    const r = await run(["fleets"]);
+    expect(r.code, r.stderr).toBe(0);
+    expect(r.stdout).toMatch(/^default\n {2}lease free/);
+  });
+
+  it("a person's --fleet naming a fleet the server doesn't have exits 1 rather than going unfiltered", async () => {
+    handler = (req) =>
+      req.path === "/agent/api/me"
+        ? { body: { kind: "human", email: "a@b.c", role: "admin", is_admin: true } }
+        : req.path.startsWith("/agent/api/fleets/")
+          ? { status: 404, body: { error: "not_found", message: "Not found" } }
+          : { body: { items: [], changes: [], cursor: 1 } };
+    const r = await run(["items", "--fleet", "side-a"]);
+    expect(r.code).toBe(1);
+    expect(r.stderr).toBe("agent-inbox: no fleet side-a on this server\n");
+    expect(seen.some((x) => x.path.startsWith("/agent/api/items"))).toBe(false);
+    // The default fleet needs no check: on such a server every item is the default fleet's.
+    expect((await run(["items", "--fleet", "default"])).code).toBe(0);
+  });
+
+  it("wait --fleet filters its first poll too", async () => {
+    handler = (req) =>
+      req.path === "/agent/api/me"
+        ? { body: { kind: "human", email: "a@b.c", role: "admin", is_admin: true } }
+        : { body: { changes: req.path.includes("since=") ? [{ seq: 2, collection: "items", doc_id: "i", op: "update", actor: "human:a@b.c", at: "x" }] : [], cursor: 1 } };
+    expect((await run(["wait", "--fleet", "side-a", "--timeout", "30"])).code).toBe(0);
+    const polls = seen.filter((x) => x.path.startsWith("/agent/api/changes"));
+    expect(polls[0].path).toBe("/agent/api/changes?fleet=side-a");
+    expect(polls.every((x) => x.path.includes("fleet=side-a"))).toBe(true);
+  });
+
   it("labels a fleet's inherited hours, and meta set schedule starts a fleet's own from them", async () => {
     handler = () => ({ body: sched({ inherited: true, version: null, inherited_version: 4 }) });
     expect((await run(["schedule"])).stdout).toContain("[inherited: the deployment's hours v4;");
+    handler = () => ({ body: sched({ inherited: true, version: null, inherited_version: null }) });
+    expect((await run(["schedule"])).stdout).toContain("[inherited: the deployment's hours, not written yet (defaults);");
     handler = () => ({ body: sched({ version: null }) });
     expect((await run(["schedule"])).stdout).toContain("[defaults; meta/schedule not written]");
     // PATCH meets no doc of its own: it reads the hours the fleet has and creates its own with the change.

@@ -134,8 +134,9 @@ export function changeLine(c) {
   return `change ${c.seq}  ${c.op}  ${target}${c.version ? ` v${c.version}` : ""}${c.status ? `  ${c.status}` : ""}  by ${c.actor || "?"}  at ${c.at}`;
 }
 
-// `fleets`: one block per fleet, its orchestrator's lease, status and hours.
-export function fleetsText(fleets, nowMs) {
+// `fleets`: one block per fleet, its orchestrator's lease, status and hours (statusVisible false: a manager token,
+// which can't read the lease and status, so their nulls mean nothing).
+export function fleetsText(fleets, nowMs, { statusVisible = true } = {}) {
   const ids = Object.keys(fleets ?? {}).sort((a, b) => (a === "default" ? -1 : b === "default" ? 1 : a.localeCompare(b)));
   if (!ids.length) return "no fleets";
   return ids
@@ -151,6 +152,7 @@ export function fleetsText(fleets, nowMs) {
       const c = f.schedule?.computed;
       const hours = c ? `${c.in_hours ? "in hours" : "off hours"} (${c.label}${f.schedule.inherited ? ", inherited" : ""})` : "";
       const ticks = `last tick ${m.last_tick ? ago(m.last_tick, nowMs) : "-"} · next ${m.next_tick ? ago(m.next_tick, nowMs) : "-"}`;
+      if (!statusVisible) return [head, "  lease and status: not visible to a manager token", hours ? `  ${hours}` : ""].filter(Boolean).join("\n");
       return [head, `  ${lease}`, `  ${ticks}${hours ? ` · ${hours}` : ""}`, m.tick_requested_at ? `  tick requested ${ago(m.tick_requested_at, nowMs)}` : ""]
         .filter(Boolean)
         .join("\n");

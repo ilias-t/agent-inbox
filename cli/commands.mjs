@@ -59,15 +59,22 @@ function fleetArg(value, flag = "--fleet") {
 }
 
 // --fleet <id>: a filter for callers who see more than one fleet (people). A token sees only its own fleet, so
-// naming another is an error rather than a filter the server would quietly ignore; naming its own is a no-op.
-// `me` saves a call when the caller already has it.
+// naming another is an error rather than a filter the server would quietly ignore; naming its own is a no-op. A
+// person's named fleet must exist on the server: one from before fleets would ignore the filter and answer with
+// every item. `me` saves a call when the caller already has it. Both errors exit 1.
 async function fleetFilter(ctx, me) {
   const want = ctx.values.fleet;
   if (want === undefined) return undefined;
   fleetArg(want);
   const own = fleetOf(me ?? (await ctx.api("GET", "/api/me")));
-  if (own !== null && own !== want) {
-    throw new ApiError(403, { error: "forbidden", message: `this token belongs to fleet ${own}, so it sees only that fleet (not ${want})` });
+  if (own !== null && own !== want) throw new Error(`this token belongs to fleet ${own}, so it sees only that fleet (not ${want})`);
+  if (own === null && want !== DEFAULT_FLEET) {
+    try {
+      await ctx.api("GET", `/api/fleets/${enc(want)}`);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) throw new Error(`no fleet ${want} on this server`);
+      throw err;
+    }
   }
   return want;
 }
@@ -200,20 +207,26 @@ export const COMMANDS = [
     summary: "Each fleet you can see, with its orchestrator's status: lease holder, next tick and work hours",
     usage: "fleets",
     run: async (ctx) => {
-      // People get every fleet in /api/state; a token, its own fleet's status there and its registry doc.
+      // People get every fleet in /api/state; a token, its own fleet's status there and its registry doc. A manager
+      // token reads neither the orchestrator's status and lease (/api/state sends them null) nor the registry: its
+      // fleet comes with `status_visible: false`, rather than nulls that read as "nobody holds the lease".
       const s = await ctx.api("GET", "/api/state", { query: { archived: "0" } });
+      const manager = s.me?.kind === "token" && s.me.scope === "orchestrator";
       let fleets = s.fleets;
       if (!fleets) {
         let doc = null;
-        try {
-          doc = (await ctx.api("GET", "/api/fleets")).fleets?.[0] ?? null;
-        } catch (err) {
-          // A manager token (403), or a server before the registry (404): no label to show.
-          if (!(err instanceof ApiError && (err.status === 403 || err.status === 404))) throw err;
+        if (!manager) {
+          try {
+            doc = (await ctx.api("GET", "/api/fleets")).fleets?.[0] ?? null;
+          } catch (err) {
+            // A server before the registry: no label to show.
+            if (!(err instanceof ApiError && err.status === 404)) throw err;
+          }
         }
         fleets = { [fleetOf(s.me) ?? DEFAULT_FLEET]: { doc, manager: s.manager, lease: s.lease, schedule: s.schedule } };
       }
-      ctx.print({ fleets }, (r) => fleetsText(r.fleets, ctx.now()));
+      const out = manager ? { fleets, status_visible: false } : { fleets };
+      ctx.print(out, (r) => fleetsText(r.fleets, ctx.now(), { statusVisible: !manager }));
     },
   },
   {
@@ -230,6 +243,7 @@ export const COMMANDS = [
     usage: "state [--fleet <id>]",
     options: fleetOpt,
     run: async (ctx) => {
+      if (ctx.values.fleet !== undefined) fleetArg(ctx.values.fleet);
       const s = await ctx.api("GET", "/api/state");
       const fleet = await fleetFilter(ctx, s.me);
       ctx.print(fleet === undefined ? s : stateOfFleet(s, fleet), (r) => stateText(r, ctx.now()));
@@ -847,13 +861,15 @@ export const COMMANDS = [
   },
 ];
 
-// /api/state narrowed to one fleet (a person's --fleet): its items and managers, and its own status, lease and
-// hours from the `fleets` map (a server before the registry sends none: the top-level ones are the default
-// fleet's). archived_total counts the fleet's archived items, which /api/state without ?archived lists in full.
+// /api/state narrowed to one fleet (a person's --fleet, or a token's own): its items and managers, and its own
+// status, lease and hours from the `fleets` map, or the top-level ones when they are that fleet's (a token's
+// own fleet; the default fleet on a server before the registry). archived_total counts the fleet's archived items,
+// which /api/state without ?archived lists in full. Review routines and the `fleets` map stay as they are.
 function stateOfFleet(s, fleet) {
   const items = s.items.filter((d) => docFleet(d) === fleet);
-  const own = s.fleets?.[fleet] ?? (fleet === DEFAULT_FLEET ? { manager: s.manager, lease: s.lease, schedule: s.schedule } : null);
-  if (!own) throw new ApiError(400, { error: "bad_request", message: `No fleet ${fleet}` });
+  const top = fleet === (fleetOf(s.me) ?? DEFAULT_FLEET) ? { manager: s.manager, lease: s.lease, schedule: s.schedule } : null;
+  const own = s.fleets?.[fleet] ?? top;
+  if (!own) throw new Error(`no fleet ${fleet} on this server`);
   return {
     ...s,
     items,
