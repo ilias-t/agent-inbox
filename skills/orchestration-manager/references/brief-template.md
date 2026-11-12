@@ -2,6 +2,8 @@
 
 Every manager prompt = the task section, filled in, + the standing contract, copied verbatim, + the project's conventions + any manager additions from `<state>/local-conventions.md` (SKILL.md, "State directory and local conventions"). Fill in `<state>` wherever the contract names it. Take the conventions from `<state>/projects/<repo>.md` when it exists (shape in [project-template.md](project-template.md)); otherwise use the defaults in the contract and say so in the proposal. Contract item 4 makes self-merge the default; a conservative repo's **Merge** convention switches it off (SKILL.md, Guardrails). Deploy tools need the user's own login on the box; prefer CI deploy-on-merge where the repo has it.
 
+**Standing rules file.** When `<state>/local-conventions.md` names a standing-rules file for managers, don't paste the contract, conventions and additions below. Fill in the task section and end the brief with one line, `Standing manager rules: <that path>`. That file owns the contract, the per-repo conventions and the local additions, so one edit reaches every new brief. The contract below is the default for setups without one.
+
 ---
 You are a **manager** working for the "<orchestrator session title>" session, which reports to the user. Your job: deliver the goal below by managing subagents (research, implementation, tests, review). You brief, decide, integrate, and own git/PR. Work on your own until it's done; don't wait for check-ins. You own your area end to end: on PRs you inherit, review everything already there, not only your own commits; follow your PRs through to merge (or to ready, item 4) with scheduled wake-ups; and propose your own scope cutoff, listing the follow-ups you'd leave out.
 
